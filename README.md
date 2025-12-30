@@ -10,76 +10,123 @@
 *   **指令引擎**：支持复合指令解析与互斥逻辑检查。
 *   **记忆系统**：Redis 短期记忆 + PostgreSQL 中长期记忆（用户画像）。
 
-## 快速开始
+---
 
-### 1. 环境准备
+## 🚀 快速开始（推荐：Docker 一键启动）
 
-*   Python 3.10+
-*   PostgreSQL 15+ (需安装 `vector` 插件)
-*   Redis 6+
+使用 Docker 是最简单的运行方式，您**无需**在本地安装 Python、PostgreSQL 或 Redis。
 
-### 2. 安装依赖
+### 1. 前置要求
 
-```bash
-pip install -r requirements.txt
-```
+*   安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac/Linux)
 
-### 3. 配置环境变量
+### 2. 配置环境变量
 
-复制 `.env.example` 为 `.env` 并填入相应的 API Key。
+复制示例配置文件，并填入您的 API Key。
 
 ```bash
+# Windows PowerShell
+copy .env.example .env
+
+# Linux / Mac
 cp .env.example .env
 ```
 
-**多模型配置示例 (.env):**
+打开 `.env` 文件，至少配置以下一项大模型服务：
 
 ```ini
-# 默认模型提供商
+# 示例：使用 OpenAI
 DEFAULT_LLM_PROVIDER=openai
 DEFAULT_LLM_MODEL=gpt-3.5-turbo
-
-# 场景化覆盖 (可选)
-# 指令控制使用 Azure (高稳定性)
-INSTRUCTION_LLM_PROVIDER=azure
-INSTRUCTION_LLM_MODEL=gpt-4
-AZURE_OPENAI_API_KEY=your_key
-AZURE_OPENAI_API_BASE=your_endpoint
-AZURE_DEPLOYMENT_NAME=your_deployment
-
-# RAG 使用 Qwen (长文本优势)
-RAG_LLM_PROVIDER=qwen
-RAG_LLM_MODEL=qwen-turbo
-QWEN_API_KEY=your_key
-
-# 闲聊使用 Deepseek (高性价比)
-CHAT_LLM_PROVIDER=deepseek
-CHAT_LLM_MODEL=deepseek-chat
-DEEPSEEK_API_KEY=your_key
+OPENAI_API_KEY=sk-xxxxxx
 ```
 
-### 4. 启动服务
+### 3. 启动服务
 
-使用 Docker Compose 一键启动（包含 DB 和 Redis）：
+在项目根目录下运行：
 
 ```bash
 docker-compose up -d
 ```
 
-或者本地启动应用：
+此命令会自动：
+1.  启动带有 `vector` 插件的 PostgreSQL 数据库。
+2.  启动 Redis 缓存服务。
+3.  构建并启动 API 服务容器（自动安装所有 Python 依赖）。
+
+### 4. 验证运行
+
+启动成功后，访问 Swagger 文档：
+👉 **http://localhost:8000/docs**
+
+---
+
+## 🛠️ 本地源码开发（仅限调试）
+
+如果您需要修改代码或进行调试，可以选择在本地运行。
+
+### 1. 环境准备
+
+*   Python 3.10+
+*   PostgreSQL 15+ (必须安装 `pgvector` 插件)
+*   Redis 6+
+
+### 2. 安装依赖
+
+```bash
+# 创建虚拟环境
+python -m venv venv
+# 激活虚拟环境 (Windows)
+.\venv\Scripts\activate
+# 激活虚拟环境 (Linux/Mac)
+source venv/bin/activate
+
+# 安装依赖
+pip install -r requirements.txt
+```
+
+### 3. 启动服务
+
+确保本地的 Postgres 和 Redis 已启动，并在 `.env` 中配置正确的 `POSTGRES_SERVER` 和 `REDIS_HOST`。
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-## API 文档
+---
 
-启动后访问 `http://localhost:8000/docs` 查看完整的 Swagger 文档。
+## API 使用指南
 
-*   `POST /api/v1/chat/completions`: 核心对话接口
-*   `POST /api/v1/admin/instructions`: 指令管理
-*   `POST /api/v1/admin/documents/upload`: 文档上传
+### 1. 核心对话接口
+
+**POST** `/api/v1/chat/completions`
+
+```json
+{
+  "query": "帮我把微波炉开到大火，加热5分钟",
+  "session_id": "sess_001",
+  "user_id": "user_123"
+}
+```
+
+### 2. 上传知识库文档
+
+**POST** `/api/v1/admin/documents/upload`
+
+*   `file`: 选择 PDF/Word/TXT 文件
+
+### 3. 配置指令
+
+**POST** `/api/v1/admin/instructions`
+
+```json
+{
+  "name": "set_firepower",
+  "description": "设置火力大小",
+  "parameters": { ... }
+}
+```
 
 ## 部署架构
 
-详见 `Deployment_Architecture_Detail.md`。
+详细的部署架构图和生产环境配置说明，请参考文档：`Deployment_Architecture_Detail.md`。
