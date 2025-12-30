@@ -1,4 +1,5 @@
 from typing import Dict, Any
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.memory_manager import MemoryManager
 from app.services.rag_engine import RAGEngine
 from langchain_openai import ChatOpenAI
@@ -8,8 +9,6 @@ import json
 
 class DialogueManager:
     def __init__(self):
-        self.memory = MemoryManager()
-        self.rag = RAGEngine()
         self.llm = ChatOpenAI(
             api_key=settings.OPENAI_API_KEY,
             base_url=settings.OPENAI_API_BASE,
@@ -17,15 +16,19 @@ class DialogueManager:
             temperature=0.1
         )
         
-    async def process_request(self, session_id: str, query: str, user_id: str) -> Dict[str, Any]:
+    async def process_request(self, session_id: str, query: str, user_id: str, db: AsyncSession) -> Dict[str, Any]:
+        # Initialize services with DB session
+        memory = MemoryManager(db)
+        rag = RAGEngine(db)
+        
         # 1. Get Context
-        history = await self.memory.get_short_term_memory(session_id)
+        history = await memory.get_short_term_memory(session_id)
         
         # 2. Intent Routing (Simplified for MVP)
         # In production, use a dedicated RouterChain here
         
         # 3. Try RAG if needed (Fallback Logic)
-        rag_context = await self.rag.search(query)
+        rag_context = await rag.search(query)
         
         # 4. Generate Response
         messages = [
@@ -50,8 +53,8 @@ class DialogueManager:
         response = await self.llm.ainvoke(messages)
         
         # 5. Save Memory
-        await self.memory.save_message(session_id, "user", query)
-        await self.memory.save_message(session_id, "assistant", response.content)
+        await memory.save_message(session_id, "user", query, user_id)
+        await memory.save_message(session_id, "assistant", response.content, user_id)
         
         return {
             "intent": "chat", # Placeholder
