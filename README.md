@@ -73,6 +73,19 @@ docker-compose up -d
 
 ### 2. Windows 环境特别说明
 
+**便捷脚本工具：**
+我们在 `scripts/` 目录下提供了 `manage_services.py` 脚本，用于在 Windows 本地一键启停 Redis 和 PostgreSQL 服务（需先修改脚本内的安装路径配置）。
+
+```bash
+# 启动服务（会弹出两个独立窗口）
+python scripts/manage_services.py start
+
+# 停止服务（优雅关闭并保存数据）
+python scripts/manage_services.py stop
+```
+
+**关于 Redis 安装：**
+
 **关于 Redis 安装：**
 如果您在安装 Redis 时看到 "Change, repair, or remove installation" 的界面，说明您的电脑上**已经安装了 Redis**。
 1.  直接点击 "Cancel" 退出安装程序。
