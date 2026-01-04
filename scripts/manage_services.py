@@ -8,13 +8,11 @@ import argparse
 REDIS_ROOT = r"F:\programe_install\Redis"
 # PostgreSQL安装根目录（无需修改）
 PG_ROOT = r"F:\programe_install\PostgreSQL"
-# PostgreSQL版本号（修改为你的实际版本，如14、15、16，必填！）
-PG_VERSION = "15"
 # =======================================================================================
 
-# 拼接PG核心路径
-PG_BIN_PATH = os.path.join(PG_ROOT, PG_VERSION, "bin")
-PG_DATA_PATH = os.path.join(PG_ROOT, PG_VERSION, "data")
+# 拼接PG核心路径（直接指向根目录下的bin和data，不依赖版本号子目录）
+PG_BIN_PATH = os.path.join(PG_ROOT, "bin")
+PG_DATA_PATH = os.path.join(PG_ROOT, "data")
 # Redis核心文件路径
 REDIS_SERVER_EXE = os.path.join(REDIS_ROOT, "redis-server.exe")
 REDIS_CLI_EXE = os.path.join(REDIS_ROOT, "redis-cli.exe")
@@ -44,7 +42,7 @@ def check_files_exists():
     for path, desc in pg_check_items:
         if not os.path.exists(path):
             print(f"【错误】缺失{desc}，路径：{path}")
-            print(f"       请检查PG_VERSION（当前设置：{PG_VERSION}）是否正确")
+            print(f"       请检查PG_ROOT（当前设置：{PG_ROOT}）是否正确")
             sys.exit(1)
 
     print("【成功】所有核心文件/目录校验通过！")
