@@ -69,9 +69,25 @@ docker-compose up -d
 
 *   Python 3.10+
 *   PostgreSQL 15+ (必须安装 `pgvector` 插件)
-*   Redis 6+
+*   **Redis 5.0+** (Windows 下可使用 5.0.14 版本)
 
-### 2. 安装依赖
+### 2. Windows 环境特别说明
+
+**关于 Redis 安装：**
+如果您在安装 Redis 时看到 "Change, repair, or remove installation" 的界面，说明您的电脑上**已经安装了 Redis**。
+1.  直接点击 "Cancel" 退出安装程序。
+2.  按 `Win + R`，输入 `services.msc` 打开服务列表。
+3.  找到 `Redis` 服务，确保其状态为 "正在运行" (Running)。
+
+**关于 PostgreSQL 安装：**
+Windows 下安装带有 pgvector 的 Postgres 比较复杂，建议**仅数据库使用 Docker 启动**，而代码在本地运行：
+
+```bash
+# 仅启动数据库和Redis容器
+docker-compose up -d db redis
+```
+
+### 3. 安装依赖
 
 ```bash
 # 创建虚拟环境
@@ -85,7 +101,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. 启动服务
+### 4. 启动服务
 
 确保本地的 Postgres 和 Redis 已启动，并在 `.env` 中配置正确的 `POSTGRES_SERVER` 和 `REDIS_HOST`。
 
