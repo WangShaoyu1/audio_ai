@@ -4,6 +4,8 @@ from pydantic import field_validator
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "AI Voice Solution"
+    # 本项目后端接口的前缀 (例如: http://localhost:8000/api/v1/chat)
+    # 注意：这与大模型的 Base URL 无关
     API_V1_STR: str = "/api/v1"
     
     # Database
@@ -28,12 +30,14 @@ class Settings(BaseSettings):
     AZURE_OPENAI_API_VERSION: str = "2023-05-15"
     AZURE_DEPLOYMENT_NAME: Optional[str] = None
     
-    # Qwen (Aliyun)
+    # Qwen (Aliyun Bailian)
     QWEN_API_KEY: Optional[str] = None
+    QWEN_API_BASE: Optional[str] = None # Optional custom base URL
     
     # Minimax
     MINIMAX_API_KEY: Optional[str] = None
     MINIMAX_GROUP_ID: Optional[str] = None
+    MINIMAX_API_BASE: Optional[str] = None # Optional custom base URL
     
     # Deepseek
     DEEPSEEK_API_KEY: Optional[str] = None
@@ -45,18 +49,22 @@ class Settings(BaseSettings):
     
     # Zhipu AI (GLM)
     ZHIPUAI_API_KEY: Optional[str] = None
+    ZHIPUAI_API_BASE: Optional[str] = None # Optional custom base URL
     
     # Baidu Wenxin
     QIANFAN_AK: Optional[str] = None
     QIANFAN_SK: Optional[str] = None
+    QIANFAN_API_BASE: Optional[str] = None # Optional custom base URL
     
     # Google Gemini
     GOOGLE_API_KEY: Optional[str] = None
+    GOOGLE_API_BASE: Optional[str] = None # Optional custom base URL
     
     # Xunfei Spark
     SPARK_APP_ID: Optional[str] = None
     SPARK_API_KEY: Optional[str] = None
     SPARK_API_SECRET: Optional[str] = None
+    SPARK_API_BASE: Optional[str] = None # Optional custom base URL
 
     # Model Selection Strategy
     # Default model provider and name

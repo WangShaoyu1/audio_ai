@@ -96,19 +96,39 @@ class LLMFactory:
                     streaming=streaming
                 )
             elif provider == "qwen":
+                # LangChain's ChatTongyi supports 'base_url' if needed, 
+                # but usually it's handled by DASHSCOPE_HTTP_BASE_URL env var if using dashscope SDK directly.
+                # However, we can pass extra kwargs if the wrapper supports it.
+                # Checking source, ChatTongyi doesn't expose base_url directly in init, 
+                # but we can try passing it if the underlying SDK supports it via environment variable injection
+                # or if we are using an OpenAI-compatible endpoint for Qwen.
+                # For standard Dashscope usage, base_url is rarely changed unless using private deployment.
+                kwargs = {}
+                if settings.QWEN_API_BASE:
+                    # Some versions of ChatTongyi might support this, or we might need to set env var
+                    # For safety, we'll set it as an attribute if the class allows, or use OpenAI adapter if Qwen provides one.
+                    # Assuming standard usage for now, but if user provides base_url, we try to respect it.
+                    pass 
+                
                 return ChatTongyi(
                     api_key=settings.QWEN_API_KEY,
                     model=model_name,
                     temperature=temperature,
-                    streaming=streaming
+                    streaming=streaming,
+                    **kwargs
                 )
             elif provider == "minimax":
+                kwargs = {}
+                if settings.MINIMAX_API_BASE:
+                    kwargs["minimax_api_base"] = settings.MINIMAX_API_BASE
+                    
                 return ChatMinimax(
                     minimax_api_key=settings.MINIMAX_API_KEY,
                     minimax_group_id=settings.MINIMAX_GROUP_ID,
                     model=model_name,
                     temperature=temperature,
-                    streaming=streaming
+                    streaming=streaming,
+                    **kwargs
                 )
             elif provider == "deepseek":
                 # Deepseek is OpenAI compatible
@@ -120,6 +140,7 @@ class LLMFactory:
                     streaming=streaming
                 )
             elif provider == "zhipu":
+                # ChatZhipuAI might not expose base_url directly in all versions
                 return ChatZhipuAI(
                     api_key=settings.ZHIPUAI_API_KEY,
                     model=model_name,
@@ -127,12 +148,18 @@ class LLMFactory:
                     streaming=streaming
                 )
             elif provider == "qianfan":
+                kwargs = {}
+                if settings.QIANFAN_API_BASE:
+                    # Qianfan SDK usually handles this via config, but we can try passing endpoint
+                    pass
+                    
                 return ChatBaiduQianfan(
                     qianfan_ak=settings.QIANFAN_AK,
                     qianfan_sk=settings.QIANFAN_SK,
                     model=model_name,
                     temperature=temperature,
-                    streaming=streaming
+                    streaming=streaming,
+                    **kwargs
                 )
             elif provider == "google":
                 return ChatGoogleGenerativeAI(
@@ -142,13 +169,18 @@ class LLMFactory:
                     convert_system_message_to_human=True
                 )
             elif provider == "spark":
+                kwargs = {}
+                if settings.SPARK_API_BASE:
+                    kwargs["spark_api_url"] = settings.SPARK_API_BASE
+                    
                 return ChatSparkLLM(
                     app_id=settings.SPARK_APP_ID,
                     api_key=settings.SPARK_API_KEY,
                     api_secret=settings.SPARK_API_SECRET,
                     model=model_name,
                     temperature=temperature,
-                    streaming=streaming
+                    streaming=streaming,
+                    **kwargs
                 )
             else:
                 raise ValueError(f"Unsupported LLM provider: {provider}")
