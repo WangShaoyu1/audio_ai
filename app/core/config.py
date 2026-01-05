@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     
     # Deepseek
     DEEPSEEK_API_KEY: Optional[str] = None
+    DEEPSEEK_API_BASE: str = "https://api.deepseek.com/v1"
     
     # OpenAI
     OPENAI_API_KEY: Optional[str] = None

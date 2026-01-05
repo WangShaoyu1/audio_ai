@@ -49,7 +49,7 @@ class LLMFactory:
                 # Deepseek is OpenAI compatible
                 return ChatOpenAI(
                     api_key=settings.DEEPSEEK_API_KEY,
-                    base_url="https://api.deepseek.com/v1",
+                    base_url=settings.DEEPSEEK_API_BASE,
                     model=model_name,
                     temperature=temperature,
                     streaming=streaming
