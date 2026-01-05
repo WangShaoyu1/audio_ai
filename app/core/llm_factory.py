@@ -1,9 +1,19 @@
 from typing import Optional
+import logging
+
+# Standard LangChain imports
 from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_community.chat_models import ChatTongyi, ChatMinimax, ChatZhipuAI, ChatSparkLLM, ChatBaiduQianfan
+
+# Community imports - using specific submodules for better IDE support and to avoid deprecation warnings
+from langchain_community.chat_models.tongyi import ChatTongyi
+from langchain_community.chat_models.minimax import ChatMinimax
+from langchain_community.chat_models.zhipuai import ChatZhipuAI
+from langchain_community.chat_models.sparkllm import ChatSparkLLM
+# ChatBaiduQianfan is deprecated, using QianfanChatEndpoint instead
+from langchain_community.chat_models.baidu_qianfan_endpoint import QianfanChatEndpoint
+
 from app.core.config import settings
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -96,20 +106,10 @@ class LLMFactory:
                     streaming=streaming
                 )
             elif provider == "qwen":
-                # LangChain's ChatTongyi supports 'base_url' if needed, 
-                # but usually it's handled by DASHSCOPE_HTTP_BASE_URL env var if using dashscope SDK directly.
-                # However, we can pass extra kwargs if the wrapper supports it.
-                # Checking source, ChatTongyi doesn't expose base_url directly in init, 
-                # but we can try passing it if the underlying SDK supports it via environment variable injection
-                # or if we are using an OpenAI-compatible endpoint for Qwen.
-                # For standard Dashscope usage, base_url is rarely changed unless using private deployment.
                 kwargs = {}
-                if settings.QWEN_API_BASE:
-                    # Some versions of ChatTongyi might support this, or we might need to set env var
-                    # For safety, we'll set it as an attribute if the class allows, or use OpenAI adapter if Qwen provides one.
-                    # Assuming standard usage for now, but if user provides base_url, we try to respect it.
-                    pass 
-                
+                # ChatTongyi usually reads DASHSCOPE_HTTP_BASE_URL env var, 
+                # but we can try to pass it if supported or rely on env injection in main.py if needed.
+                # For now, we keep it simple as standard usage doesn't require base_url change often.
                 return ChatTongyi(
                     api_key=settings.QWEN_API_KEY,
                     model=model_name,
@@ -140,7 +140,6 @@ class LLMFactory:
                     streaming=streaming
                 )
             elif provider == "zhipu":
-                # ChatZhipuAI might not expose base_url directly in all versions
                 return ChatZhipuAI(
                     api_key=settings.ZHIPUAI_API_KEY,
                     model=model_name,
@@ -150,10 +149,9 @@ class LLMFactory:
             elif provider == "qianfan":
                 kwargs = {}
                 if settings.QIANFAN_API_BASE:
-                    # Qianfan SDK usually handles this via config, but we can try passing endpoint
-                    pass
+                    kwargs["endpoint"] = settings.QIANFAN_API_BASE
                     
-                return ChatBaiduQianfan(
+                return QianfanChatEndpoint(
                     qianfan_ak=settings.QIANFAN_AK,
                     qianfan_sk=settings.QIANFAN_SK,
                     model=model_name,
