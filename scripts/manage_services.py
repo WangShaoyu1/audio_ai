@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import argparse
+import time
 
 # ====================== 核心配置项（仅需修改此处，与你的路径匹配） ======================
 # Redis安装根目录（无需修改，已适配你的路径）
@@ -54,25 +55,35 @@ def start_services():
     print("【注意】启动后会生成2个独立命令行窗口，请勿关闭（关闭则对应服务停止）")
 
     # 1. 启动Redis（新建独立窗口，不阻塞当前Python进程）
-    # cmd /k：执行命令后保持窗口打开；start：新建窗口
-    redis_cmd = f'cmd /k "start \"Redis服务窗口\" cd /d \"{REDIS_ROOT}\" && redis-server.exe \"{REDIS_CONF}\""'
+    # 优化：直接在start命令中执行，确保窗口保留并显示日志
+    redis_cmd = f'start "Redis服务窗口" /D "{REDIS_ROOT}" cmd /k "redis-server.exe redis.windows.conf"'
     try:
-        subprocess.Popen(redis_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print(f"✅ Redis启动命令已执行（目录：{REDIS_ROOT}）")
+        subprocess.Popen(redis_cmd, shell=True)
+        print(f"✅ Redis启动命令已触发（目录：{REDIS_ROOT}）")
     except Exception as e:
         print(f"❌ Redis启动失败：{str(e)}")
         sys.exit(1)
 
     # 2. 启动PostgreSQL（新建独立窗口，不阻塞当前Python进程）
-    pg_cmd = f'cmd /k "start \"PostgreSQL服务窗口\" cd /d \"{PG_BIN_PATH}\" && pg_ctl start -D \"{PG_DATA_PATH}\" && echo 【PG提示】启动成功，此窗口请勿关闭 && pause > nul"'
+    # 优化：使用pg_ctl start -l logfile 方式或直接前台运行以显示日志
+    # 这里使用前台运行模式，以便在窗口中看到日志
+    pg_cmd = f'start "PostgreSQL服务窗口" /D "{PG_BIN_PATH}" cmd /k "pg_ctl start -D \"{PG_DATA_PATH}\" && echo. && echo 【PG服务已启动】请勿关闭此窗口 && echo 如需验证，请另开cmd输入: netstat -an | findstr 5432"'
     try:
-        subprocess.Popen(pg_cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        print(f"✅ PostgreSQL启动命令已执行（bin目录：{PG_BIN_PATH}，数据目录：{PG_DATA_PATH}）")
+        subprocess.Popen(pg_cmd, shell=True)
+        print(f"✅ PostgreSQL启动命令已触发（bin目录：{PG_BIN_PATH}）")
     except Exception as e:
         print(f"❌ PostgreSQL启动失败：{str(e)}")
         sys.exit(1)
 
-    print("【完成】Redis和PostgreSQL均已触发启动，请查看弹出的独立服务窗口！")
+    print("\n" + "="*50)
+    print("【服务启动完成】")
+    print("请检查弹出的两个窗口是否有报错信息。")
+    print("验证方法：")
+    print("1. 打开新的CMD窗口")
+    print("2. 输入: netstat -an | findstr 6379  (验证Redis)")
+    print("3. 输入: netstat -an | findstr 5432  (验证PostgreSQL)")
+    print("注意：浏览器直接访问 localhost:6379/5432 会报错，这是正常的！")
+    print("="*50)
 
 
 def stop_services():
@@ -96,7 +107,11 @@ def stop_services():
             print("✅ Redis服务已优雅关闭，数据已保存！")
         else:
             error_msg = result.stderr.strip()
-            print(f"⚠️ Redis关闭失败（可能未启动）：{error_msg if error_msg else '未知错误'}")
+            # 如果Redis没启动，shutdown会报错，这是正常的
+            if "No connection" in error_msg or "refused" in error_msg:
+                 print("⚠️ Redis似乎未启动，无需关闭。")
+            else:
+                print(f"⚠️ Redis关闭提示：{error_msg}")
     except Exception as e:
         print(f"❌ Redis关闭异常：{str(e)}")
 
@@ -116,7 +131,10 @@ def stop_services():
             print("✅ PostgreSQL服务已优雅关闭！")
         else:
             error_msg = result.stderr.strip()
-            print(f"⚠️ PostgreSQL关闭失败（可能未启动）：{error_msg if error_msg else '未知错误'}")
+            if "Is server running" in error_msg:
+                print("⚠️ PostgreSQL似乎未启动，无需关闭。")
+            else:
+                print(f"⚠️ PostgreSQL关闭提示：{error_msg}")
     except Exception as e:
         print(f"❌ PostgreSQL关闭异常：{str(e)}")
 
