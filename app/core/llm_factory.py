@@ -1,17 +1,49 @@
-from typing import Optional
+from typing import Optional, Any
 import logging
 
-# Standard LangChain imports
-from langchain_openai import ChatOpenAI, AzureChatOpenAI
-from langchain_google_genai import ChatGoogleGenerativeAI
+# Standard LangChain imports (Core packages usually present)
+try:
+    from langchain_openai import ChatOpenAI, AzureChatOpenAI
+except ImportError:
+    ChatOpenAI = None
+    AzureChatOpenAI = None
 
-# Community imports - using specific submodules for better IDE support and to avoid deprecation warnings
-from langchain_community.chat_models.tongyi import ChatTongyi
-from langchain_community.chat_models.minimax import ChatMinimax
-from langchain_community.chat_models.zhipuai import ChatZhipuAI
-from langchain_community.chat_models.sparkllm import ChatSparkLLM
-# ChatBaiduQianfan is deprecated, using QianfanChatEndpoint instead
-from langchain_community.chat_models.baidu_qianfan_endpoint import QianfanChatEndpoint
+try:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+except ImportError:
+    ChatGoogleGenerativeAI = None
+
+# Community imports - using safe imports to avoid IDE errors and runtime crashes
+# if specific provider packages are missing
+try:
+    from langchain_community.chat_models.tongyi import ChatTongyi
+except ImportError:
+    ChatTongyi = None
+
+try:
+    from langchain_community.chat_models.minimax import ChatMinimax
+except ImportError:
+    ChatMinimax = None
+
+try:
+    from langchain_community.chat_models.zhipuai import ChatZhipuAI
+except ImportError:
+    ChatZhipuAI = None
+
+try:
+    # Try importing SparkLLM from various possible locations or ignore if missing
+    from langchain_community.chat_models.sparkllm import ChatSparkLLM
+except ImportError:
+    try:
+        # Fallback for older versions
+        from langchain_community.chat_models import ChatSparkLLM
+    except ImportError:
+        ChatSparkLLM = None
+
+try:
+    from langchain_community.chat_models.baidu_qianfan_endpoint import QianfanChatEndpoint
+except ImportError:
+    QianfanChatEndpoint = None
 
 from app.core.config import settings
 
@@ -81,6 +113,17 @@ class LLMFactory:
             )
 
     @staticmethod
+    def _check_dependency(cls_obj: Any, provider_name: str, package_hint: str = "langchain-community"):
+        """
+        Check if the model class was successfully imported.
+        """
+        if cls_obj is None:
+            raise ImportError(
+                f"Could not import the class for provider '{provider_name}'. "
+                f"Please ensure '{package_hint}' is installed and up to date."
+            )
+
+    @staticmethod
     def create_llm(provider: str, model_name: str, temperature: float = 0.1, streaming: bool = False):
         provider = provider.lower()
         
@@ -89,6 +132,7 @@ class LLMFactory:
         
         try:
             if provider == "openai":
+                LLMFactory._check_dependency(ChatOpenAI, "openai", "langchain-openai")
                 return ChatOpenAI(
                     api_key=settings.OPENAI_API_KEY,
                     base_url=settings.OPENAI_API_BASE,
@@ -97,6 +141,7 @@ class LLMFactory:
                     streaming=streaming
                 )
             elif provider == "azure":
+                LLMFactory._check_dependency(AzureChatOpenAI, "azure", "langchain-openai")
                 return AzureChatOpenAI(
                     api_key=settings.AZURE_OPENAI_API_KEY,
                     azure_endpoint=settings.AZURE_OPENAI_API_BASE,
@@ -106,10 +151,8 @@ class LLMFactory:
                     streaming=streaming
                 )
             elif provider == "qwen":
+                LLMFactory._check_dependency(ChatTongyi, "qwen")
                 kwargs = {}
-                # ChatTongyi usually reads DASHSCOPE_HTTP_BASE_URL env var, 
-                # but we can try to pass it if supported or rely on env injection in main.py if needed.
-                # For now, we keep it simple as standard usage doesn't require base_url change often.
                 return ChatTongyi(
                     api_key=settings.QWEN_API_KEY,
                     model=model_name,
@@ -118,6 +161,7 @@ class LLMFactory:
                     **kwargs
                 )
             elif provider == "minimax":
+                LLMFactory._check_dependency(ChatMinimax, "minimax")
                 kwargs = {}
                 if settings.MINIMAX_API_BASE:
                     kwargs["minimax_api_base"] = settings.MINIMAX_API_BASE
@@ -132,6 +176,7 @@ class LLMFactory:
                 )
             elif provider == "deepseek":
                 # Deepseek is OpenAI compatible
+                LLMFactory._check_dependency(ChatOpenAI, "deepseek", "langchain-openai")
                 return ChatOpenAI(
                     api_key=settings.DEEPSEEK_API_KEY,
                     base_url=settings.DEEPSEEK_API_BASE,
@@ -140,6 +185,7 @@ class LLMFactory:
                     streaming=streaming
                 )
             elif provider == "zhipu":
+                LLMFactory._check_dependency(ChatZhipuAI, "zhipu")
                 return ChatZhipuAI(
                     api_key=settings.ZHIPUAI_API_KEY,
                     model=model_name,
@@ -147,6 +193,7 @@ class LLMFactory:
                     streaming=streaming
                 )
             elif provider == "qianfan":
+                LLMFactory._check_dependency(QianfanChatEndpoint, "qianfan")
                 kwargs = {}
                 if settings.QIANFAN_API_BASE:
                     kwargs["endpoint"] = settings.QIANFAN_API_BASE
@@ -160,6 +207,7 @@ class LLMFactory:
                     **kwargs
                 )
             elif provider == "google":
+                LLMFactory._check_dependency(ChatGoogleGenerativeAI, "google", "langchain-google-genai")
                 return ChatGoogleGenerativeAI(
                     google_api_key=settings.GOOGLE_API_KEY,
                     model=model_name,
@@ -167,6 +215,7 @@ class LLMFactory:
                     convert_system_message_to_human=True
                 )
             elif provider == "spark":
+                LLMFactory._check_dependency(ChatSparkLLM, "spark")
                 kwargs = {}
                 if settings.SPARK_API_BASE:
                     kwargs["spark_api_url"] = settings.SPARK_API_BASE
