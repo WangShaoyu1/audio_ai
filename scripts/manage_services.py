@@ -20,6 +20,8 @@ REDIS_CLI_EXE = os.path.join(REDIS_ROOT, "redis-cli.exe")
 REDIS_CONF = os.path.join(REDIS_ROOT, "redis.windows.conf")
 # PG核心工具路径
 PG_CTL_EXE = os.path.join(PG_BIN_PATH, "pg_ctl.exe")
+# PG主程序路径（用于前台运行显示日志）
+PG_SERVER_EXE = os.path.join(PG_BIN_PATH, "postgres.exe")
 
 
 def check_files_exists():
@@ -38,6 +40,7 @@ def check_files_exists():
     # 校验PG文件/目录
     pg_check_items = [
         (PG_CTL_EXE, "PG核心工具（pg_ctl.exe）"),
+        (PG_SERVER_EXE, "PG主程序（postgres.exe）"),
         (PG_DATA_PATH, "PG数据目录（data）")
     ]
     for path, desc in pg_check_items:
@@ -65,9 +68,9 @@ def start_services():
         sys.exit(1)
 
     # 2. 启动PostgreSQL（新建独立窗口，不阻塞当前Python进程）
-    # 优化：使用pg_ctl start -l logfile 方式或直接前台运行以显示日志
-    # 这里使用前台运行模式，以便在窗口中看到日志
-    pg_cmd = f'start "PostgreSQL服务窗口" /D "{PG_BIN_PATH}" cmd /k "pg_ctl start -D \"{PG_DATA_PATH}\" && echo. && echo 【PG服务已启动】请勿关闭此窗口 && echo 如需验证，请另开cmd输入: netstat -an | findstr 5432"'
+    # 优化：改用 postgres.exe -D data 方式直接前台运行
+    # 这样日志会直接打印在窗口中，且关闭窗口=关闭服务，符合直觉
+    pg_cmd = f'start "PostgreSQL服务窗口" /D "{PG_BIN_PATH}" cmd /k "postgres.exe -D \"{PG_DATA_PATH}\""'
     try:
         subprocess.Popen(pg_cmd, shell=True)
         print(f"✅ PostgreSQL启动命令已触发（bin目录：{PG_BIN_PATH}）")
@@ -77,12 +80,8 @@ def start_services():
 
     print("\n" + "="*50)
     print("【服务启动完成】")
-    print("请检查弹出的两个窗口是否有报错信息。")
-    print("验证方法：")
-    print("1. 打开新的CMD窗口")
-    print("2. 输入: netstat -an | findstr 6379  (验证Redis)")
-    print("3. 输入: netstat -an | findstr 5432  (验证PostgreSQL)")
-    print("注意：浏览器直接访问 localhost:6379/5432 会报错，这是正常的！")
+    print("现在两个窗口都应该显示实时滚动的日志了。")
+    print("注意：关闭任意一个黑色窗口，对应的服务就会停止！")
     print("="*50)
 
 
@@ -131,8 +130,8 @@ def stop_services():
             print("✅ PostgreSQL服务已优雅关闭！")
         else:
             error_msg = result.stderr.strip()
-            if "Is server running" in error_msg:
-                print("⚠️ PostgreSQL似乎未启动，无需关闭。")
+            if "Is server running" in error_msg or "PID file" in error_msg:
+                print("⚠️ PostgreSQL似乎未启动（或已通过关闭窗口停止），无需额外操作。")
             else:
                 print(f"⚠️ PostgreSQL关闭提示：{error_msg}")
     except Exception as e:
