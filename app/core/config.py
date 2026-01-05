@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     # 注意：这与大模型的 Base URL 无关
     API_V1_STR: str = "/api/v1"
     
+    # Region & Endpoint Configuration
+    USE_GLOBAL_ENDPOINTS: bool = False
+
     # Database
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_USER: str = "postgres"
@@ -27,44 +30,53 @@ class Settings(BaseSettings):
     # Azure OpenAI
     AZURE_OPENAI_API_KEY: Optional[str] = None
     AZURE_OPENAI_API_BASE: Optional[str] = None
+    AZURE_OPENAI_API_BASE_GLOBAL: Optional[str] = None
     AZURE_OPENAI_API_VERSION: str = "2023-05-15"
     AZURE_DEPLOYMENT_NAME: Optional[str] = None
     
     # Qwen (Aliyun Bailian)
     QWEN_API_KEY: Optional[str] = None
-    QWEN_API_BASE: Optional[str] = None # Optional custom base URL
+    QWEN_API_BASE: Optional[str] = None 
+    QWEN_API_BASE_GLOBAL: Optional[str] = None
     
     # Minimax
     MINIMAX_API_KEY: Optional[str] = None
     MINIMAX_GROUP_ID: Optional[str] = None
-    MINIMAX_API_BASE: Optional[str] = None # Optional custom base URL
+    MINIMAX_API_BASE: Optional[str] = None 
+    MINIMAX_API_BASE_GLOBAL: Optional[str] = None
     
     # Deepseek
     DEEPSEEK_API_KEY: Optional[str] = None
     DEEPSEEK_API_BASE: str = "https://api.deepseek.com/v1"
+    DEEPSEEK_API_BASE_GLOBAL: str = "https://api.deepseek.com/v1"
     
     # OpenAI
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_API_BASE: Optional[str] = None
+    OPENAI_API_BASE_GLOBAL: Optional[str] = None
     
     # Zhipu AI (GLM)
     ZHIPUAI_API_KEY: Optional[str] = None
-    ZHIPUAI_API_BASE: Optional[str] = None # Optional custom base URL
+    ZHIPUAI_API_BASE: Optional[str] = None 
+    ZHIPUAI_API_BASE_GLOBAL: Optional[str] = None
     
     # Baidu Wenxin
     QIANFAN_AK: Optional[str] = None
     QIANFAN_SK: Optional[str] = None
-    QIANFAN_API_BASE: Optional[str] = None # Optional custom base URL
+    QIANFAN_API_BASE: Optional[str] = None 
+    QIANFAN_API_BASE_GLOBAL: Optional[str] = None
     
     # Google Gemini
     GOOGLE_API_KEY: Optional[str] = None
-    GOOGLE_API_BASE: Optional[str] = None # Optional custom base URL
+    GOOGLE_API_BASE: Optional[str] = None 
+    GOOGLE_API_BASE_GLOBAL: Optional[str] = None
     
     # Xunfei Spark
     SPARK_APP_ID: Optional[str] = None
     SPARK_API_KEY: Optional[str] = None
     SPARK_API_SECRET: Optional[str] = None
-    SPARK_API_BASE: Optional[str] = None # Optional custom base URL
+    SPARK_API_BASE: Optional[str] = None 
+    SPARK_API_BASE_GLOBAL: Optional[str] = None
 
     # Model Selection Strategy
     # Default model provider and name

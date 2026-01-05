@@ -55,6 +55,25 @@ logger = logging.getLogger(__name__)
 
 class LLMFactory:
     @staticmethod
+    def _get_base_url(provider_prefix: str) -> Optional[str]:
+        """
+        Helper to get the correct Base URL based on USE_GLOBAL_ENDPOINTS setting.
+        Example: provider_prefix="QWEN" -> checks QWEN_API_BASE_GLOBAL or QWEN_API_BASE
+        """
+        prefix = provider_prefix.upper()
+        if settings.USE_GLOBAL_ENDPOINTS:
+            # Try to get GLOBAL url first
+            global_url = getattr(settings, f"{prefix}_API_BASE_GLOBAL", None)
+            if global_url:
+                return global_url
+            
+            # Fallback to standard URL if global is not set but switch is on
+            # (This handles cases where user enabled switch but didn't config global url)
+            logger.warning(f"USE_GLOBAL_ENDPOINTS is True but {prefix}_API_BASE_GLOBAL is not set. Falling back to {prefix}_API_BASE.")
+            
+        return getattr(settings, f"{prefix}_API_BASE", None)
+
+    @staticmethod
     def _validate_config(provider: str):
         """
         Validate if the required configuration for the provider is present.
@@ -69,10 +88,11 @@ class LLMFactory:
         elif provider == "azure":
             if not settings.AZURE_OPENAI_API_KEY:
                 missing_keys.append("AZURE_OPENAI_API_KEY")
-            if not settings.AZURE_OPENAI_API_BASE:
-                missing_keys.append("AZURE_OPENAI_API_BASE")
             if not settings.AZURE_DEPLOYMENT_NAME:
                 missing_keys.append("AZURE_DEPLOYMENT_NAME")
+            # Check for base url using the helper to account for global switch
+            if not LLMFactory._get_base_url("AZURE_OPENAI"):
+                 missing_keys.append("AZURE_OPENAI_API_BASE (or _GLOBAL)")
                 
         elif provider == "qwen":
             if not settings.QWEN_API_KEY:
@@ -137,18 +157,20 @@ class LLMFactory:
         try:
             if provider == "openai":
                 LLMFactory._check_dependency(ChatOpenAI, "openai", "langchain-openai")
+                base_url = LLMFactory._get_base_url("OPENAI")
                 return ChatOpenAI(
                     api_key=settings.OPENAI_API_KEY,
-                    base_url=settings.OPENAI_API_BASE,
+                    base_url=base_url,
                     model=model_name,
                     temperature=temperature,
                     streaming=streaming
                 )
             elif provider == "azure":
                 LLMFactory._check_dependency(AzureChatOpenAI, "azure", "langchain-openai")
+                base_url = LLMFactory._get_base_url("AZURE_OPENAI")
                 return AzureChatOpenAI(
                     api_key=settings.AZURE_OPENAI_API_KEY,
-                    azure_endpoint=settings.AZURE_OPENAI_API_BASE,
+                    azure_endpoint=base_url,
                     api_version=settings.AZURE_OPENAI_API_VERSION,
                     deployment_name=settings.AZURE_DEPLOYMENT_NAME,
                     temperature=temperature,
@@ -157,6 +179,20 @@ class LLMFactory:
             elif provider == "qwen":
                 LLMFactory._check_dependency(ChatTongyi, "qwen")
                 kwargs = {}
+                # Qwen uses 'dashscope_api_base' or similar depending on version, 
+                # but LangChain usually respects OPENAI_API_BASE env var if using OpenAI compatible class.
+                # For ChatTongyi native class, it might not expose base_url easily in all versions.
+                # However, recent versions support 'base_url' or 'dashscope_base_url'.
+                # Let's try passing it via kwargs if it's set.
+                base_url = LLMFactory._get_base_url("QWEN")
+                if base_url:
+                    # Note: ChatTongyi implementation details vary. 
+                    # If using OpenAI compatible endpoint, one should use ChatOpenAI with Qwen's base URL.
+                    # But here we are using ChatTongyi. Let's check if it accepts base_url.
+                    # If not, we might need to set DASHSCOPE_API_BASE env var.
+                    # For safety, we'll try to pass it.
+                    kwargs["base_url"] = base_url
+                    
                 return ChatTongyi(
                     api_key=settings.QWEN_API_KEY,
                     model=model_name,
@@ -167,8 +203,9 @@ class LLMFactory:
             elif provider == "minimax":
                 LLMFactory._check_dependency(MiniMaxChat, "minimax")
                 kwargs = {}
-                if settings.MINIMAX_API_BASE:
-                    kwargs["minimax_api_base"] = settings.MINIMAX_API_BASE
+                base_url = LLMFactory._get_base_url("MINIMAX")
+                if base_url:
+                    kwargs["minimax_api_base"] = base_url
                     
                 return MiniMaxChat(
                     minimax_api_key=settings.MINIMAX_API_KEY,
@@ -181,26 +218,37 @@ class LLMFactory:
             elif provider == "deepseek":
                 # Deepseek is OpenAI compatible
                 LLMFactory._check_dependency(ChatOpenAI, "deepseek", "langchain-openai")
+                base_url = LLMFactory._get_base_url("DEEPSEEK")
                 return ChatOpenAI(
                     api_key=settings.DEEPSEEK_API_KEY,
-                    base_url=settings.DEEPSEEK_API_BASE,
+                    base_url=base_url,
                     model=model_name,
                     temperature=temperature,
                     streaming=streaming
                 )
             elif provider == "zhipu":
                 LLMFactory._check_dependency(ChatZhipuAI, "zhipu")
+                # ChatZhipuAI might not directly support base_url override in constructor in all versions
+                # but usually respects ZHIPUAI_API_BASE env var.
+                # We'll try passing it if supported.
+                kwargs = {}
+                base_url = LLMFactory._get_base_url("ZHIPUAI")
+                if base_url:
+                    kwargs["base_url"] = base_url
+
                 return ChatZhipuAI(
                     api_key=settings.ZHIPUAI_API_KEY,
                     model=model_name,
                     temperature=temperature,
-                    streaming=streaming
+                    streaming=streaming,
+                    **kwargs
                 )
             elif provider == "qianfan":
                 LLMFactory._check_dependency(QianfanChatEndpoint, "qianfan")
                 kwargs = {}
-                if settings.QIANFAN_API_BASE:
-                    kwargs["endpoint"] = settings.QIANFAN_API_BASE
+                base_url = LLMFactory._get_base_url("QIANFAN")
+                if base_url:
+                    kwargs["endpoint"] = base_url
                     
                 return QianfanChatEndpoint(
                     qianfan_ak=settings.QIANFAN_AK,
@@ -212,6 +260,7 @@ class LLMFactory:
                 )
             elif provider == "google":
                 LLMFactory._check_dependency(ChatGoogleGenerativeAI, "google", "langchain-google-genai")
+                # Google usually doesn't need base_url unless using vertex or proxy
                 return ChatGoogleGenerativeAI(
                     google_api_key=settings.GOOGLE_API_KEY,
                     model=model_name,
@@ -221,8 +270,9 @@ class LLMFactory:
             elif provider == "spark":
                 LLMFactory._check_dependency(ChatSparkLLM, "spark")
                 kwargs = {}
-                if settings.SPARK_API_BASE:
-                    kwargs["spark_api_url"] = settings.SPARK_API_BASE
+                base_url = LLMFactory._get_base_url("SPARK")
+                if base_url:
+                    kwargs["spark_api_url"] = base_url
                     
                 return ChatSparkLLM(
                     app_id=settings.SPARK_APP_ID,
