@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import Optional, Dict, Any
+from pydantic import field_validator
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "AI Voice Solution"
@@ -76,7 +77,19 @@ class Settings(BaseSettings):
     RAG_ENABLE: bool = True
     MEMORY_ENABLE: bool = True
 
+    @field_validator("*", mode="before")
+    def empty_str_to_none(cls, v: Any) -> Any:
+        """
+        Convert empty strings to None.
+        This allows .env file to have keys with empty values (e.g. KEY=)
+        which will be treated as None instead of empty string "".
+        """
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
+
     class Config:
         env_file = ".env"
+        extra = "ignore"  # Ignore extra fields in .env
 
 settings = Settings()

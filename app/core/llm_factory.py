@@ -9,8 +9,73 @@ logger = logging.getLogger(__name__)
 
 class LLMFactory:
     @staticmethod
+    def _validate_config(provider: str):
+        """
+        Validate if the required configuration for the provider is present.
+        Raises ValueError with a clear message if config is missing.
+        """
+        missing_keys = []
+        
+        if provider == "openai":
+            if not settings.OPENAI_API_KEY:
+                missing_keys.append("OPENAI_API_KEY")
+        
+        elif provider == "azure":
+            if not settings.AZURE_OPENAI_API_KEY:
+                missing_keys.append("AZURE_OPENAI_API_KEY")
+            if not settings.AZURE_OPENAI_API_BASE:
+                missing_keys.append("AZURE_OPENAI_API_BASE")
+            if not settings.AZURE_DEPLOYMENT_NAME:
+                missing_keys.append("AZURE_DEPLOYMENT_NAME")
+                
+        elif provider == "qwen":
+            if not settings.QWEN_API_KEY:
+                missing_keys.append("QWEN_API_KEY")
+                
+        elif provider == "minimax":
+            if not settings.MINIMAX_API_KEY:
+                missing_keys.append("MINIMAX_API_KEY")
+            if not settings.MINIMAX_GROUP_ID:
+                missing_keys.append("MINIMAX_GROUP_ID")
+                
+        elif provider == "deepseek":
+            if not settings.DEEPSEEK_API_KEY:
+                missing_keys.append("DEEPSEEK_API_KEY")
+                
+        elif provider == "zhipu":
+            if not settings.ZHIPUAI_API_KEY:
+                missing_keys.append("ZHIPUAI_API_KEY")
+                
+        elif provider == "qianfan":
+            if not settings.QIANFAN_AK:
+                missing_keys.append("QIANFAN_AK")
+            if not settings.QIANFAN_SK:
+                missing_keys.append("QIANFAN_SK")
+                
+        elif provider == "google":
+            if not settings.GOOGLE_API_KEY:
+                missing_keys.append("GOOGLE_API_KEY")
+                
+        elif provider == "spark":
+            if not settings.SPARK_APP_ID:
+                missing_keys.append("SPARK_APP_ID")
+            if not settings.SPARK_API_KEY:
+                missing_keys.append("SPARK_API_KEY")
+            if not settings.SPARK_API_SECRET:
+                missing_keys.append("SPARK_API_SECRET")
+
+        if missing_keys:
+            raise ValueError(
+                f"Missing configuration for provider '{provider}': {', '.join(missing_keys)}. "
+                f"Please check your .env file."
+            )
+
+    @staticmethod
     def create_llm(provider: str, model_name: str, temperature: float = 0.1, streaming: bool = False):
         provider = provider.lower()
+        
+        # Validate config before attempting to create LLM
+        LLMFactory._validate_config(provider)
         
         try:
             if provider == "openai":
