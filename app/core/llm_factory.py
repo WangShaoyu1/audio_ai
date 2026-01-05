@@ -21,9 +21,13 @@ except ImportError:
     ChatTongyi = None
 
 try:
-    from langchain_community.chat_models.minimax import ChatMinimax
+    # Correct class name is MiniMaxChat, but keeping fallback just in case
+    from langchain_community.chat_models.minimax import MiniMaxChat
 except ImportError:
-    ChatMinimax = None
+    try:
+        from langchain_community.chat_models.minimax import ChatMinimax as MiniMaxChat
+    except ImportError:
+        MiniMaxChat = None
 
 try:
     from langchain_community.chat_models.zhipuai import ChatZhipuAI
@@ -161,12 +165,12 @@ class LLMFactory:
                     **kwargs
                 )
             elif provider == "minimax":
-                LLMFactory._check_dependency(ChatMinimax, "minimax")
+                LLMFactory._check_dependency(MiniMaxChat, "minimax")
                 kwargs = {}
                 if settings.MINIMAX_API_BASE:
                     kwargs["minimax_api_base"] = settings.MINIMAX_API_BASE
                     
-                return ChatMinimax(
+                return MiniMaxChat(
                     minimax_api_key=settings.MINIMAX_API_KEY,
                     minimax_group_id=settings.MINIMAX_GROUP_ID,
                     model=model_name,
