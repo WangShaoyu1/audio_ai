@@ -12,6 +12,58 @@
 
 ---
 
+## 🏗️ 系统架构 (System Architecture)
+
+### 1. 系统流程图 (Flowchart)
+
+展示了从用户语音输入到系统最终响应的完整数据流向。
+
+![System Flowchart](docs/architecture.png)
+
+### 2. 核心调用时序 (Sequence Diagram)
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant API as Backend API
+    participant DM as Dialogue Manager
+    participant Memory as Memory Manager (Redis/PG)
+    participant RAG as RAG Engine
+    participant LLM as LLM Factory
+    participant Provider as Model Provider
+
+    User->>Frontend: Speak (Voice Input)
+    Frontend->>API: Send Audio/Text
+    API->>DM: Process Request (session_id, text)
+    
+    par Parallel Context Retrieval
+        DM->>Memory: Get Short-term History
+        Memory-->>DM: Return History List
+    and
+        DM->>RAG: Retrieve Relevant Docs
+        RAG->>RAG: Vector Search (PG)
+        RAG-->>DM: Return Context Chunks
+    end
+    
+    DM->>DM: Construct Prompt (System + Context + History + Query)
+    DM->>LLM: Create LLM Instance (Provider Config)
+    LLM->>Provider: Chat Completion Request
+    Provider-->>LLM: Stream/Return Response
+    LLM-->>DM: Text Response
+    
+    par Async Save
+        DM->>Memory: Save Turn (User + AI)
+        Memory->>Memory: Write to Redis & PG
+    end
+    
+    DM-->>API: Final Response Object
+    API-->>Frontend: Return Text & Audio URL
+    Frontend->>User: Play Audio & Show Text
+```
+
+---
+
 ## 🚀 快速开始（推荐：Docker 一键启动）
 
 使用 Docker 是最简单的运行方式，您**无需**在本地安装 Python、PostgreSQL 或 Redis。
@@ -71,7 +123,27 @@ docker-compose up -d
 *   PostgreSQL 15+ (必须安装 `pgvector` 插件)
 *   **Redis 5.0+** (Windows 下可使用 5.0.14 版本)
 
-### 2. Windows 环境特别说明
+### 2. 数据库初始化 (Database Setup)
+
+在首次运行代码之前，**必须**执行初始化脚本以创建数据库和表结构。
+
+**PostgreSQL 初始化：**
+我们提供了一键初始化脚本，它会自动：
+1.  检查并创建 `audio_ai` 数据库（如果不存在）。
+2.  启用 `vector` 扩展（用于 RAG）。
+3.  根据 `models.py` 定义创建所有数据表。
+
+```bash
+# 确保已激活虚拟环境
+python scripts/init_db.py
+```
+
+**Redis 初始化：**
+Redis 是 Schema-less 的，**无需建表**。只需确保 Redis 服务已启动即可。
+*   **数据结构**：使用 List 存储会话历史。
+*   **Key 格式**：`session:{session_id}:history`
+
+### 3. Windows 环境特别说明
 
 **便捷脚本工具：**
 我们在 `scripts/` 目录下提供了 `manage_services.py` 脚本，用于在 Windows 本地一键启停 Redis 和 PostgreSQL 服务（需先修改脚本内的安装路径配置）。
@@ -84,14 +156,6 @@ python scripts/manage_services.py start
 python scripts/manage_services.py stop
 ```
 
-**关于 Redis 安装：**
-
-**关于 Redis 安装：**
-如果您在安装 Redis 时看到 "Change, repair, or remove installation" 的界面，说明您的电脑上**已经安装了 Redis**。
-1.  直接点击 "Cancel" 退出安装程序。
-2.  按 `Win + R`，输入 `services.msc` 打开服务列表。
-3.  找到 `Redis` 服务，确保其状态为 "正在运行" (Running)。
-
 **关于 PostgreSQL 安装：**
 Windows 下安装带有 pgvector 的 Postgres 比较复杂，建议**仅数据库使用 Docker 启动**，而代码在本地运行：
 
@@ -100,7 +164,7 @@ Windows 下安装带有 pgvector 的 Postgres 比较复杂，建议**仅数据�
 docker-compose up -d db redis
 ```
 
-### 3. 安装依赖
+### 4. 安装依赖与启动
 
 ```bash
 # 创建虚拟环境
@@ -112,13 +176,8 @@ source venv/bin/activate
 
 # 安装依赖
 pip install -r requirements.txt
-```
 
-### 4. 启动服务
-
-确保本地的 Postgres 和 Redis 已启动，并在 `.env` 中配置正确的 `POSTGRES_SERVER` 和 `REDIS_HOST`。
-
-```bash
+# 启动服务
 uvicorn app.main:app --reload
 ```
 
@@ -155,7 +214,3 @@ uvicorn app.main:app --reload
   "parameters": { ... }
 }
 ```
-
-## 部署架构
-
-详细的部署架构图和生产环境配置说明，请参考文档：`Deployment_Architecture_Detail.md`。
