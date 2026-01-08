@@ -34,7 +34,14 @@ const resources = {
       "inst.save": "Save Changes",
       "inst.systemPrompt": "System Prompt",
       "inst.maxTokens": "Max Tokens",
-      "inst.temperature": "Temperature"
+      "inst.temperature": "Temperature",
+      "common.loading": "Loading...",
+      "common.error": "Error",
+      "common.success": "Success",
+      "common.delete": "Delete",
+      "common.download": "Download",
+      "common.status": "Status",
+      "common.result": "Result"
     }
   },
   zh: {
@@ -69,7 +76,14 @@ const resources = {
       "inst.save": "保存更改",
       "inst.systemPrompt": "系统提示词",
       "inst.maxTokens": "最大 Token 数",
-      "inst.temperature": "温度"
+      "inst.temperature": "温度",
+      "common.loading": "加载中...",
+      "common.error": "错误",
+      "common.success": "成功",
+      "common.delete": "删除",
+      "common.download": "下载",
+      "common.status": "状态",
+      "common.result": "结果"
     }
   },
   zh_TW: {
@@ -104,7 +118,14 @@ const resources = {
       "inst.save": "保存更改",
       "inst.systemPrompt": "系統提示詞",
       "inst.maxTokens": "最大 Token 數",
-      "inst.temperature": "溫度"
+      "inst.temperature": "溫度",
+      "common.loading": "加載中...",
+      "common.error": "錯誤",
+      "common.success": "成功",
+      "common.delete": "刪除",
+      "common.download": "下載",
+      "common.status": "狀態",
+      "common.result": "結果"
     }
   },
   ja: {
@@ -139,7 +160,14 @@ const resources = {
       "inst.save": "変更を保存",
       "inst.systemPrompt": "システムプロンプト",
       "inst.maxTokens": "最大トークン",
-      "inst.temperature": "温度"
+      "inst.temperature": "温度",
+      "common.loading": "読み込み中...",
+      "common.error": "エラー",
+      "common.success": "成功",
+      "common.delete": "削除",
+      "common.download": "ダウンロード",
+      "common.status": "ステータス",
+      "common.result": "結果"
     }
   },
   de: {
@@ -174,7 +202,14 @@ const resources = {
       "inst.save": "Änderungen speichern",
       "inst.systemPrompt": "System-Prompt",
       "inst.maxTokens": "Max Token",
-      "inst.temperature": "Temperatur"
+      "inst.temperature": "Temperatur",
+      "common.loading": "Laden...",
+      "common.error": "Fehler",
+      "common.success": "Erfolg",
+      "common.delete": "Löschen",
+      "common.download": "Herunterladen",
+      "common.status": "Status",
+      "common.result": "Ergebnis"
     }
   }
 };

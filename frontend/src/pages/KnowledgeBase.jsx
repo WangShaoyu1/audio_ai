@@ -1,9 +1,11 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Database, Upload, Trash2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 const KnowledgeBase = () => {
+  const { t } = useTranslation();
   // Mock data for now as backend endpoints might not be fully ready for file management
   const documents = [
     { id: 1, name: 'product_manual_v1.pdf', size: '2.4 MB', uploaded: '2024-01-08' },
@@ -14,19 +16,19 @@ const KnowledgeBase = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Knowledge Base</h2>
-          <p className="text-muted-foreground">Manage documents for RAG retrieval.</p>
+          <h2 className="text-2xl font-bold tracking-tight">{t('kb.title')}</h2>
+          <p className="text-muted-foreground">{t('nav.knowledgeBase')}</p>
         </div>
         <Button>
           <Upload className="mr-2 h-4 w-4" />
-          Upload Document
+          {t('kb.upload')}
         </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Documents</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('kb.totalDocs')}</CardTitle>
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -35,11 +37,11 @@ const KnowledgeBase = () => {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Vector Store</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('kb.vectorStatus')}</CardTitle>
             <Database className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Active</div>
+            <div className="text-2xl font-bold">{t('common.status')}</div>
             <p className="text-xs text-muted-foreground">PostgreSQL + pgvector</p>
           </CardContent>
         </Card>
@@ -47,9 +49,9 @@ const KnowledgeBase = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Documents</CardTitle>
+          <CardTitle>{t('nav.knowledgeBase')}</CardTitle>
           <CardDescription>
-            List of files currently indexed in the knowledge base.
+            {t('kb.title')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -57,10 +59,10 @@ const KnowledgeBase = () => {
             <table className="w-full text-sm text-left">
               <thead className="bg-muted/50 text-muted-foreground">
                 <tr>
-                  <th className="p-4 font-medium">Name</th>
-                  <th className="p-4 font-medium">Size</th>
-                  <th className="p-4 font-medium">Uploaded</th>
-                  <th className="p-4 font-medium text-right">Actions</th>
+                  <th className="p-4 font-medium">{t('kb.table.name')}</th>
+                  <th className="p-4 font-medium">{t('kb.table.size')}</th>
+                  <th className="p-4 font-medium">{t('kb.table.date')}</th>
+                  <th className="p-4 font-medium text-right">{t('kb.table.actions')}</th>
                 </tr>
               </thead>
               <tbody>

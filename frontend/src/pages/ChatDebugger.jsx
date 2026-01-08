@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Send, Clock, Map, Cpu, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const MessageBubble = ({ role, content, metadata }) => {
   const isUser = role === 'user';
+  const { t } = useTranslation();
   
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-6`}>
@@ -22,15 +24,15 @@ const MessageBubble = ({ role, content, metadata }) => {
         
         {!isUser && metadata && (
           <div className="mt-2 text-xs text-muted-foreground grid grid-cols-2 gap-2 bg-muted/30 p-2 rounded border border-border/50">
-            <div className="flex items-center gap-1" title="Latency">
+            <div className="flex items-center gap-1" title={t('chat.latency')}>
               <Clock className="h-3 w-3" />
               <span>{metadata.latency?.total_ms || 0}ms</span>
             </div>
-            <div className="flex items-center gap-1" title="Route">
+            <div className="flex items-center gap-1" title={t('chat.route')}>
               <Map className="h-3 w-3" />
               <span className="uppercase">{metadata.route}</span>
             </div>
-            <div className="flex items-center gap-1 col-span-2" title="Models">
+            <div className="flex items-center gap-1 col-span-2" title={t('chat.model')}>
               <Cpu className="h-3 w-3" />
               <span>{metadata.models_used?.executor || 'N/A'}</span>
             </div>
@@ -47,6 +49,7 @@ const MessageBubble = ({ role, content, metadata }) => {
 };
 
 const ChatDebugger = () => {
+  const { t } = useTranslation();
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -97,7 +100,7 @@ const ChatDebugger = () => {
       console.error('Chat error:', error);
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: `Error: ${error.message}`,
+        content: `${t('common.error')}: ${error.message}`,
         isError: true
       }]);
     } finally {
@@ -111,7 +114,7 @@ const ChatDebugger = () => {
         <CardHeader className="border-b border-border py-4 bg-muted/10">
           <CardTitle className="text-lg flex items-center gap-2">
             <Search className="h-5 w-5" />
-            Live Chat Debugger
+            {t('chat.title')}
           </CardTitle>
         </CardHeader>
         
@@ -119,7 +122,7 @@ const ChatDebugger = () => {
           {messages.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50">
               <Cpu className="h-12 w-12 mb-4" />
-              <p>Start a conversation to debug the pipeline</p>
+              <p>{t('chat.subtitle')}</p>
             </div>
           )}
           
@@ -130,7 +133,7 @@ const ChatDebugger = () => {
           {loading && (
             <div className="flex justify-start mb-6">
               <div className="bg-secondary text-secondary-foreground px-4 py-3 rounded-lg text-sm animate-pulse">
-                Thinking...
+                {t('common.loading')}
               </div>
             </div>
           )}
@@ -142,13 +145,13 @@ const ChatDebugger = () => {
             <Input 
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Type a message to test..."
+              placeholder={t('chat.placeholder')}
               className="flex-1"
               disabled={loading}
             />
             <Button type="submit" disabled={loading || !input.trim()}>
               <Send className="h-4 w-4 mr-2" />
-              Send
+              {t('chat.send')}
             </Button>
           </form>
         </div>
