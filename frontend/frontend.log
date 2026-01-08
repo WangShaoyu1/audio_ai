@@ -1,0 +1,11 @@
+nohup: ignoring input
+
+> audio-ai-admin@0.0.0 dev
+> vite --host 0.0.0.0 --port 3000
+
+Re-optimizing dependencies because lockfile has changed
+
+  VITE v5.4.21  ready in 224 ms
+
+  ➜  Local:   http://localhost:3000/
+  ➜  Network: http://169.254.0.21:3000/

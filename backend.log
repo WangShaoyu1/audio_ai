@@ -1,0 +1,23 @@
+nohup: ignoring input
+INFO:     Started server process [65891]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+Save Memory Error: (sqlalchemy.dialects.postgresql.asyncpg.Error) <class 'asyncpg.exceptions.DataError'>: invalid input for query argument $2: 'test_session_qwen' (invalid UUID 'test_session_qwen': length must be between 32..36 characters, got 17)
+[SQL: INSERT INTO messages (id, session_id, role, content, embedding, created_at) VALUES ($1::UUID, $2::UUID, $3::VARCHAR, $4::VARCHAR, $5, $6::TIMESTAMP WITHOUT TIME ZONE)]
+[parameters: (UUID('0051b598-951f-4498-adeb-6e9278a67c2f'), 'test_session_qwen', 'user', '你好，请介绍一下你自己', None, datetime.datetime(2026, 1, 8, 7, 13, 37, 370705))]
+(Background on this error at: https://sqlalche.me/e/20/dbapi)
+Save Memory Error: (sqlalchemy.dialects.postgresql.asyncpg.Error) <class 'asyncpg.exceptions.DataError'>: invalid input for query argument $2: 'test_session_qwen' (invalid UUID 'test_session_qwen': length must be between 32..36 characters, got 17)
+[SQL: INSERT INTO messages (id, session_id, role, content, embedding, created_at) VALUES ($1::UUID, $2::UUID, $3::VARCHAR, $4::VARCHAR, $5, $6::TIMESTAMP WITHOUT TIME ZONE)]
+[parameters: (UUID('6d69b442-6f66-4aec-9c74-f573a06000ed'), 'test_session_qwen', 'assistant', '你好！我是通义千问（Qwen），是阿里巴巴集团旗下的通义实验室自主研发的超大规模语言模型。我能够回答问题、创作文字，比如写故事、写公文、写邮件、写剧本、逻辑推理、编程等等，还能表达观点，玩游戏等。如果你有任何问题或需要帮助，欢迎随时告诉我！', None, datetime.datetime(2026, 1, 8, 7, 13, 37, 383500))]
+(Background on this error at: https://sqlalche.me/e/20/dbapi)
+INFO:     127.0.0.1:49570 - "POST /api/v1/chat/completions HTTP/1.1" 200 OK
+Save Memory Error: (sqlalchemy.dialects.postgresql.asyncpg.Error) <class 'asyncpg.exceptions.DataError'>: invalid input for query argument $2: 'test_session_qwen' (invalid UUID 'test_session_qwen': length must be between 32..36 characters, got 17)
+[SQL: INSERT INTO messages (id, session_id, role, content, embedding, created_at) VALUES ($1::UUID, $2::UUID, $3::VARCHAR, $4::VARCHAR, $5, $6::TIMESTAMP WITHOUT TIME ZONE)]
+[parameters: (UUID('d8225152-f101-4f88-bfeb-f10b224c0af7'), 'test_session_qwen', 'user', '1+1等于几？', None, datetime.datetime(2026, 1, 8, 7, 13, 56, 107216))]
+(Background on this error at: https://sqlalche.me/e/20/dbapi)
+Save Memory Error: (sqlalchemy.dialects.postgresql.asyncpg.Error) <class 'asyncpg.exceptions.DataError'>: invalid input for query argument $2: 'test_session_qwen' (invalid UUID 'test_session_qwen': length must be between 32..36 characters, got 17)
+[SQL: INSERT INTO messages (id, session_id, role, content, embedding, created_at) VALUES ($1::UUID, $2::UUID, $3::VARCHAR, $4::VARCHAR, $5, $6::TIMESTAMP WITHOUT TIME ZONE)]
+[parameters: (UUID('eb139098-1ea9-4eb8-9dec-d2b33785270a'), 'test_session_qwen', 'assistant', '1+1等于2。', None, datetime.datetime(2026, 1, 8, 7, 13, 56, 109887))]
+(Background on this error at: https://sqlalche.me/e/20/dbapi)
+INFO:     127.0.0.1:53224 - "POST /api/v1/chat/completions HTTP/1.1" 200 OK

@@ -72,8 +72,8 @@ if __name__ == "__main__":
     from sqlalchemy import text
     
     try:
-        # 1. Create Database
-        asyncio.run(create_database_if_not_exists())
+        # 1. Create Database (Skipped as we created it manually)
+        # asyncio.run(create_database_if_not_exists())
         
         # 2. Create Tables & Extensions
         asyncio.run(init_tables())
