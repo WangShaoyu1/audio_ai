@@ -194,7 +194,7 @@ class LLMFactory:
                     kwargs["base_url"] = base_url
                     
                 return ChatTongyi(
-                    api_key=settings.QWEN_API_KEY,
+                    dashscope_api_key=settings.QWEN_API_KEY,
                     model=model_name,
                     temperature=temperature,
                     streaming=streaming,

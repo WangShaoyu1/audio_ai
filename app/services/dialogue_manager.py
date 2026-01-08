@@ -4,7 +4,7 @@ from app.services.memory_manager import MemoryManager
 from app.services.rag_engine import RAGEngine
 from app.services.search_service import search_service
 from app.core.llm_factory import LLMFactory
-from langchain.schema import HumanMessage, SystemMessage, AIMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from app.core.config import settings
 import json
 import logging
