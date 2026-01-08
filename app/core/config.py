@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     
+    # Web Search Configuration
+    # Provider: duckduckgo (default), tavily, serper
+    SEARCH_PROVIDER: str = "duckduckgo"
+    TAVILY_API_KEY: Optional[str] = None
+    SERPER_API_KEY: Optional[str] = None
+    
     # LLM Provider Configs
     # Azure OpenAI
     AZURE_OPENAI_API_KEY: Optional[str] = None
