@@ -1,0 +1,192 @@
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+
+const resources = {
+  en: {
+    translation: {
+      "nav.chatDebugger": "Chat Debugger",
+      "nav.knowledgeBase": "Knowledge Base",
+      "nav.batchEval": "Batch Eval",
+      "nav.instructions": "Instructions",
+      "chat.title": "Live Chat Debugger",
+      "chat.subtitle": "Start a conversation to debug the pipeline",
+      "chat.placeholder": "Type a message to test...",
+      "chat.send": "Send",
+      "chat.user": "User",
+      "chat.ai": "AI",
+      "chat.latency": "Latency",
+      "chat.route": "Route",
+      "chat.model": "Model",
+      "kb.title": "Knowledge Base",
+      "kb.totalDocs": "Total Documents",
+      "kb.vectorStatus": "Vector Store Status",
+      "kb.upload": "Upload Document",
+      "kb.table.name": "Name",
+      "kb.table.size": "Size",
+      "kb.table.date": "Upload Date",
+      "kb.table.actions": "Actions",
+      "eval.title": "Batch Evaluation",
+      "eval.upload": "Upload Evaluation File",
+      "eval.dragDrop": "Drag and drop your Excel file here",
+      "eval.requirements": "File Requirements",
+      "eval.history": "Evaluation History",
+      "inst.title": "System Instructions",
+      "inst.save": "Save Changes",
+      "inst.systemPrompt": "System Prompt",
+      "inst.maxTokens": "Max Tokens",
+      "inst.temperature": "Temperature"
+    }
+  },
+  zh: {
+    translation: {
+      "nav.chatDebugger": "聊天调试",
+      "nav.knowledgeBase": "知识库",
+      "nav.batchEval": "批量评测",
+      "nav.instructions": "指令配置",
+      "chat.title": "实时聊天调试",
+      "chat.subtitle": "开始对话以调试流水线",
+      "chat.placeholder": "输入消息进行测试...",
+      "chat.send": "发送",
+      "chat.user": "用户",
+      "chat.ai": "AI",
+      "chat.latency": "延迟",
+      "chat.route": "路由",
+      "chat.model": "模型",
+      "kb.title": "知识库管理",
+      "kb.totalDocs": "文档总数",
+      "kb.vectorStatus": "向量库状态",
+      "kb.upload": "上传文档",
+      "kb.table.name": "名称",
+      "kb.table.size": "大小",
+      "kb.table.date": "上传日期",
+      "kb.table.actions": "操作",
+      "eval.title": "批量评测",
+      "eval.upload": "上传评测文件",
+      "eval.dragDrop": "拖拽 Excel 文件到此处",
+      "eval.requirements": "文件要求",
+      "eval.history": "评测历史",
+      "inst.title": "系统指令配置",
+      "inst.save": "保存更改",
+      "inst.systemPrompt": "系统提示词",
+      "inst.maxTokens": "最大 Token 数",
+      "inst.temperature": "温度"
+    }
+  },
+  zh_TW: {
+    translation: {
+      "nav.chatDebugger": "聊天調試",
+      "nav.knowledgeBase": "知識庫",
+      "nav.batchEval": "批量評測",
+      "nav.instructions": "指令配置",
+      "chat.title": "實時聊天調試",
+      "chat.subtitle": "開始對話以調試流水線",
+      "chat.placeholder": "輸入消息進行測試...",
+      "chat.send": "發送",
+      "chat.user": "用戶",
+      "chat.ai": "AI",
+      "chat.latency": "延遲",
+      "chat.route": "路由",
+      "chat.model": "模型",
+      "kb.title": "知識庫管理",
+      "kb.totalDocs": "文檔總數",
+      "kb.vectorStatus": "向量庫狀態",
+      "kb.upload": "上傳文檔",
+      "kb.table.name": "名稱",
+      "kb.table.size": "大小",
+      "kb.table.date": "上傳日期",
+      "kb.table.actions": "操作",
+      "eval.title": "批量評測",
+      "eval.upload": "上傳評測文件",
+      "eval.dragDrop": "拖拽 Excel 文件到此處",
+      "eval.requirements": "文件要求",
+      "eval.history": "評測歷史",
+      "inst.title": "系統指令配置",
+      "inst.save": "保存更改",
+      "inst.systemPrompt": "系統提示詞",
+      "inst.maxTokens": "最大 Token 數",
+      "inst.temperature": "溫度"
+    }
+  },
+  ja: {
+    translation: {
+      "nav.chatDebugger": "チャットデバッグ",
+      "nav.knowledgeBase": "ナレッジベース",
+      "nav.batchEval": "バッチ評価",
+      "nav.instructions": "指示設定",
+      "chat.title": "ライブチャットデバッグ",
+      "chat.subtitle": "パイプラインをデバッグするために会話を開始",
+      "chat.placeholder": "テストメッセージを入力...",
+      "chat.send": "送信",
+      "chat.user": "ユーザー",
+      "chat.ai": "AI",
+      "chat.latency": "レイテンシ",
+      "chat.route": "ルート",
+      "chat.model": "モデル",
+      "kb.title": "ナレッジベース管理",
+      "kb.totalDocs": "総ドキュメント数",
+      "kb.vectorStatus": "ベクトルストア状態",
+      "kb.upload": "ドキュメントをアップロード",
+      "kb.table.name": "名前",
+      "kb.table.size": "サイズ",
+      "kb.table.date": "アップロード日",
+      "kb.table.actions": "操作",
+      "eval.title": "バッチ評価",
+      "eval.upload": "評価ファイルをアップロード",
+      "eval.dragDrop": "Excelファイルをここにドラッグ＆ドロップ",
+      "eval.requirements": "ファイル要件",
+      "eval.history": "評価履歴",
+      "inst.title": "システム指示設定",
+      "inst.save": "変更を保存",
+      "inst.systemPrompt": "システムプロンプト",
+      "inst.maxTokens": "最大トークン",
+      "inst.temperature": "温度"
+    }
+  },
+  de: {
+    translation: {
+      "nav.chatDebugger": "Chat-Debugger",
+      "nav.knowledgeBase": "Wissensdatenbank",
+      "nav.batchEval": "Batch-Auswertung",
+      "nav.instructions": "Anweisungen",
+      "chat.title": "Live-Chat-Debugger",
+      "chat.subtitle": "Starten Sie ein Gespräch, um die Pipeline zu debuggen",
+      "chat.placeholder": "Geben Sie eine Nachricht zum Testen ein...",
+      "chat.send": "Senden",
+      "chat.user": "Benutzer",
+      "chat.ai": "KI",
+      "chat.latency": "Latenz",
+      "chat.route": "Route",
+      "chat.model": "Modell",
+      "kb.title": "Wissensdatenbank-Verwaltung",
+      "kb.totalDocs": "Gesamtdokumente",
+      "kb.vectorStatus": "Vektorspeicher-Status",
+      "kb.upload": "Dokument hochladen",
+      "kb.table.name": "Name",
+      "kb.table.size": "Größe",
+      "kb.table.date": "Upload-Datum",
+      "kb.table.actions": "Aktionen",
+      "eval.title": "Batch-Auswertung",
+      "eval.upload": "Auswertungsdatei hochladen",
+      "eval.dragDrop": "Excel-Datei hierher ziehen",
+      "eval.requirements": "Dateianforderungen",
+      "eval.history": "Auswertungsverlauf",
+      "inst.title": "Systemanweisungen",
+      "inst.save": "Änderungen speichern",
+      "inst.systemPrompt": "System-Prompt",
+      "inst.maxTokens": "Max Token",
+      "inst.temperature": "Temperatur"
+    }
+  }
+};
+
+i18n
+  .use(initReactI18next)
+  .init({
+    resources,
+    lng: "zh", // 默认语言
+    interpolation: {
+      escapeValue: false
+    }
+  });
+
+export default i18n;
