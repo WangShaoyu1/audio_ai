@@ -41,7 +41,7 @@ npm install
 npm run dev
 ```
 
-Access the Admin Dashboard at `http://localhost:5173`.
+Access the Admin Dashboard at `http://localhost:3000` (if started with port 3000) or `http://localhost:5173` (default).
 
 ## 📚 Documentation
 
@@ -59,9 +59,9 @@ SEARCH_PROVIDER=duckduckgo # or tavily, serper
 TAVILY_API_KEY=...
 
 # LLM Routing
-INSTRUCTION_LLM_MODEL=minimax-m2
-RAG_LLM_MODEL=gpt-4o
-CHAT_LLM_MODEL=qwen-max
+INSTRUCTION_LLM_MODEL=gpt-4.1-mini
+RAG_LLM_MODEL=gpt-4.1-mini
+CHAT_LLM_MODEL=gpt-4.1-mini
 ```
 
 ## 📊 Batch Evaluation
