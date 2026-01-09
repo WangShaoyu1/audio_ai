@@ -198,6 +198,7 @@ class LLMFactory:
                     model=model_name,
                     temperature=temperature,
                     streaming=streaming,
+                    max_retries=3,
                     **kwargs
                 )
             elif provider == "minimax":

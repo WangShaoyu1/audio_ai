@@ -100,32 +100,43 @@ async def upload_document(
     
     # 2. Read content
     content = ""
-    file_content = await file.read()
-    
-    if file.filename.lower().endswith('.pdf'):
-        import io
-        from pypdf import PdfReader
-        try:
+    try:
+        file_content = await file.read()
+        
+        if file.filename.lower().endswith('.pdf'):
+            import io
+            from pypdf import PdfReader
             pdf_file = io.BytesIO(file_content)
             reader = PdfReader(pdf_file)
             text_content = []
             for page in reader.pages:
-                text_content.append(page.extract_text())
+                text = page.extract_text()
+                if text:
+                    text_content.append(text)
             content = "\n".join(text_content)
-        except Exception as e:
-            content = f"Error reading PDF: {str(e)}"
-    else:
-        try:
-            content = file_content.decode("utf-8")
-        except UnicodeDecodeError:
-            content = "Binary file content placeholder"
-    
-    # 3. Indexing
-    rag = RAGEngine(db)
-    await rag.index_document(doc_id, content)
-    
-    # 4. Update status
-    doc.status = "indexed"
-    await db.commit()
+        else:
+            try:
+                content = file_content.decode("utf-8")
+            except UnicodeDecodeError:
+                # Try latin-1 as fallback
+                content = file_content.decode("latin-1")
+        
+        if not content.strip():
+            raise ValueError("Empty document content")
+
+        # 3. Indexing
+        rag = RAGEngine(db)
+        await rag.index_document(doc_id, content)
+        
+        # 4. Update status
+        doc.status = "indexed"
+        await db.commit()
+        
+    except Exception as e:
+        doc.status = "failed"
+        await db.commit()
+        from app.core.logger import logger
+        logger.exception(f"Document upload failed for {doc_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Document processing failed: {str(e)}")
     
     return {"id": str(doc_id), "status": "indexed"}
