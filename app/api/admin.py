@@ -10,6 +10,7 @@ from app.services.rag_engine import RAGEngine
 from app.models.base import Document, User
 from app.api.deps import get_current_user
 from typing import List, Dict, Any
+from pydantic import BaseModel
 import uuid
 import io
 
@@ -140,3 +141,17 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=f"Document processing failed: {str(e)}")
     
     return {"id": str(doc_id), "status": "indexed"}
+
+class RetrieveRequest(BaseModel):
+    query: str
+    top_k: int = 3
+
+@router.post("/admin/rag/retrieve")
+async def retrieve_documents(
+    request: RetrieveRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    rag = RAGEngine(db)
+    results = await rag.search(request.query, current_user.id, request.top_k)
+    return {"results": results}

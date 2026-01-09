@@ -40,7 +40,7 @@ export default function Instructions() {
       const data = await response.json();
       setInstructions(data);
     } catch (error) {
-      toast.error("Failed to load instructions");
+      toast.error("加载指令失败");
     } finally {
       setLoading(false);
     }
@@ -57,7 +57,7 @@ export default function Instructions() {
       try {
         parsedParams = JSON.parse(newInstruction.parameters);
       } catch (e) {
-        toast.error("Invalid JSON parameters");
+        toast.error("JSON 参数格式错误");
         return;
       }
 
@@ -76,60 +76,60 @@ export default function Instructions() {
 
       if (!response.ok) throw new Error("Failed to create instruction");
       
-      toast.success("Instruction created successfully");
+      toast.success("指令创建成功");
       setOpen(false);
       setNewInstruction({ name: "", description: "", parameters: "{}" });
       fetchInstructions();
     } catch (error) {
-      toast.error("Failed to create instruction");
+      toast.error("创建指令失败");
     }
   };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Instructions</h1>
+        <h1 className="text-3xl font-bold">指令管理</h1>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => window.open("/api/v1/templates/instructions", "_blank")}>
             <Download className="w-4 h-4 mr-2" />
-            Template
+            下载模板
           </Button>
           <Button variant="outline" onClick={fetchInstructions} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-            Refresh
+            刷新
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="w-4 h-4 mr-2" />
-                New Instruction
+                新建指令
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Create New Instruction</DialogTitle>
+                <DialogTitle>创建新指令</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">Name</Label>
+                  <Label htmlFor="name">名称</Label>
                   <Input
                     id="name"
                     value={newInstruction.name}
                     onChange={(e) => setNewInstruction({ ...newInstruction, name: e.target.value })}
-                    placeholder="e.g., start_cooking"
+                    placeholder="例如: start_cooking"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description">描述</Label>
                   <Textarea
                     id="description"
                     value={newInstruction.description}
                     onChange={(e) => setNewInstruction({ ...newInstruction, description: e.target.value })}
-                    placeholder="Description of what this instruction does"
+                    placeholder="该指令的功能描述"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="parameters">Parameters (JSON)</Label>
+                  <Label htmlFor="parameters">参数 (JSON)</Label>
                   <Textarea
                     id="parameters"
                     value={newInstruction.parameters}
@@ -140,7 +140,7 @@ export default function Instructions() {
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={handleCreate}>Create</Button>
+                <Button onClick={handleCreate}>创建</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -149,23 +149,23 @@ export default function Instructions() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Defined Instructions</CardTitle>
+          <CardTitle>已定义指令</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Parameters</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>名称</TableHead>
+                <TableHead>描述</TableHead>
+                <TableHead>参数</TableHead>
+                <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {instructions.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                    No instructions defined. Create one to get started.
+                    暂无指令，请创建。
                   </TableCell>
                 </TableRow>
               ) : (

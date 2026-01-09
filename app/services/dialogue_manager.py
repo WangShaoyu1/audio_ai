@@ -1,5 +1,6 @@
 from typing import Dict, Any, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.services.memory_manager import MemoryManager
 from app.services.rag_engine import RAGEngine
 from app.services.search_service import search_service
@@ -23,13 +24,30 @@ class DialogueManager:
         trace_id = str(uuid.uuid4())
         
         # Ensure session_id is valid UUID or create new
+        is_new_session = False
         if not session_id:
             session_id = str(uuid.uuid4())
+            is_new_session = True
         else:
             try:
                 uuid.UUID(session_id)
+                # Check if session exists in DB
+                from app.models.base import Session
+                result = await db.execute(select(Session).filter(Session.id == session_id))
+                if not result.scalar_one_or_none():
+                    is_new_session = True
             except (ValueError, TypeError):
                 session_id = str(uuid.uuid4())
+                is_new_session = True
+
+        # Create session if new
+        if is_new_session:
+            from app.models.base import Session
+            # Auto-name from first 20 chars of query
+            session_name = query[:20] + "..." if len(query) > 20 else query
+            new_session = Session(id=session_id, user_id=user_id, name=session_name)
+            db.add(new_session)
+            await db.commit()
 
         memory = MemoryManager(db)
         rag = RAGEngine(db)

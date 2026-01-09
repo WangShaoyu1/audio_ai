@@ -1,17 +1,44 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Send, Sparkles, Terminal, Book, FileSpreadsheet, Settings, LogOut } from "lucide-react";
+import { Mic, MicOff, Send, Sparkles, Terminal, Book, FileSpreadsheet, Settings, LogOut, Plus, MessageSquare, MoreVertical, Trash, Edit2, Sun, Moon } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Message, SystemState, SAMPLE_PROMPTS } from '@/lib/types';
 import VoiceVisualizer from '@/components/VoiceVisualizer';
 import MicrowaveStatus from '@/components/MicrowaveStatus';
 import JsonLogger from '@/components/JsonLogger';
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+
+interface Session {
+  id: string;
+  name: string;
+  created_at: string;
+}
 
 export default function Home() {
   const [, setLocation] = useLocation();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [sessionToRename, setSessionToRename] = useState<Session | null>(null);
+  const [newName, setNewName] = useState("");
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
   const [systemState, setSystemState] = useState<SystemState>({
     isListening: false,
     isProcessing: false,
@@ -27,33 +54,93 @@ export default function Home() {
     }
   });
 
-  // Simulate microwave timer
   useEffect(() => {
-    const timer = setInterval(() => {
-      setSystemState(prev => {
-        if (prev.microwaveState.status === 'cooking' && prev.microwaveState.remaining && prev.microwaveState.remaining > 0) {
-          return {
-            ...prev,
-            microwaveState: {
-              ...prev.microwaveState,
-              remaining: prev.microwaveState.remaining - 1
-            }
-          };
-        } else if (prev.microwaveState.status === 'cooking' && prev.microwaveState.remaining === 0) {
-          return {
-            ...prev,
-            microwaveState: {
-              ...prev.microwaveState,
-              status: 'finished',
-              remaining: null
-            }
-          };
-        }
-        return prev;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
+    fetchSessions();
+    // Check system theme preference
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+      setTheme('light');
+    }
   }, []);
+
+  useEffect(() => {
+    document.documentElement.classList.remove('light', 'dark');
+    document.documentElement.classList.add(theme);
+  }, [theme]);
+
+  const fetchSessions = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+      const res = await fetch("/api/v1/sessions", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSessions(data);
+        if (data.length > 0 && !currentSessionId) {
+          selectSession(data[0].id);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch sessions", error);
+    }
+  };
+
+  const createSession = () => {
+    setCurrentSessionId(null);
+    setMessages([]);
+    // Ideally, we create the session on the backend when the first message is sent, 
+    // or explicitly create it here. For now, we just clear the UI state.
+  };
+
+  const selectSession = async (sessionId: string) => {
+    setCurrentSessionId(sessionId);
+    // Fetch messages for this session (not implemented in backend yet, so we just clear for now or need to implement message history fetch)
+    // For now, we assume history is loaded via chat context or separate endpoint.
+    // Since we don't have a message history endpoint, we start fresh or need to add one.
+    // Let's assume we start fresh for demo purposes or need to implement it.
+    setMessages([]); 
+  };
+
+  const renameSession = async () => {
+    if (!sessionToRename) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/v1/sessions/${sessionToRename.id}/rename`, {
+        method: "PUT",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ name: newName })
+      });
+      if (res.ok) {
+        fetchSessions();
+        setIsRenameDialogOpen(false);
+      }
+    } catch (error) {
+      console.error("Failed to rename session", error);
+    }
+  };
+
+  const deleteSession = async (sessionId: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/v1/sessions/${sessionId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchSessions();
+        if (currentSessionId === sessionId) {
+          setCurrentSessionId(null);
+          setMessages([]);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to delete session", error);
+    }
+  };
 
   const handleSendMessage = async (text: string) => {
     if (!text.trim()) return;
@@ -69,67 +156,71 @@ export default function Home() {
     setInput('');
     setSystemState(prev => ({ ...prev, isProcessing: true }));
     
-    // Simulate AI processing delay
-    setTimeout(() => {
-      processCommand(text);
-    }, 1500);
-  };
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/v1/chat/completions", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          session_id: currentSessionId,
+          query: text,
+          stream: false
+        })
+      });
 
-  const processCommand = (text: string) => {
-    const lowerText = text.toLowerCase();
-    let responseMsg: Message = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: '',
-      timestamp: Date.now(),
-      latency: Math.floor(Math.random() * 500) + 200, // 200-700ms latency
-      confidence: 0.92 + Math.random() * 0.07 // 0.92-0.99 confidence
-    };
+      if (res.ok) {
+        const data = await res.json();
+        const result = data.data;
+        
+        // Update session ID if it was new
+        if (!currentSessionId && result.metadata?.trace_id) {
+           // The backend doesn't return session_id in the response structure defined in endpoints.py
+           // We might need to refresh sessions list to get the new session
+           fetchSessions();
+        }
 
-    // Simple rule-based logic for demo purposes
-    if (lowerText.includes('start') || lowerText.includes('cook')) {
-      responseMsg.content = "Starting cooking with high firepower for 5 minutes.";
-      responseMsg.intent = "INSTRUCTION_CONTROL";
-      responseMsg.functionCall = {
-        name: "voice_cmd_start_cooking",
-        arguments: { firepower: "high", duration: 300 }
-      };
-      setSystemState(prev => ({
-        ...prev,
-        isProcessing: false,
-        microwaveState: {
-          ...prev.microwaveState,
-          status: 'cooking',
-          firepower: 'high',
-          remaining: 300
+        const assistantMsg: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: result.content,
+          timestamp: Date.now(),
+          latency: result.metadata?.latency?.total_ms,
+          intent: result.metadata?.route
+        };
+        
+        setMessages(prev => [...prev, assistantMsg]);
+        
+        // Update system state based on actions
+        if (result.actions && result.actions.length > 0) {
+           // Handle mock actions
+           const action = result.actions[0];
+           if (action.type === 'mock_instruction') {
+             // Parse payload to update microwave state (simple heuristic)
+             if (action.payload.includes('start')) {
+                setSystemState(prev => ({
+                  ...prev,
+                  microwaveState: { ...prev.microwaveState, status: 'cooking', remaining: 300 }
+                }));
+             } else if (action.payload.includes('pause')) {
+                setSystemState(prev => ({
+                  ...prev,
+                  microwaveState: { ...prev.microwaveState, status: 'paused' }
+                }));
+             }
+           }
         }
-      }));
-    } else if (lowerText.includes('pause')) {
-      responseMsg.content = "Cooking paused.";
-      responseMsg.intent = "INSTRUCTION_CONTROL";
-      responseMsg.functionCall = {
-        name: "voice_cmd_pause_cooking",
-        arguments: {}
-      };
-      setSystemState(prev => ({
-        ...prev,
-        isProcessing: false,
-        microwaveState: {
-          ...prev.microwaveState,
-          status: 'paused'
-        }
-      }));
-    } else if (lowerText.includes('recipe') || lowerText.includes('how to')) {
-      responseMsg.content = "I found a great recipe for that. You'll need 500g of chicken wings, honey, soy sauce, and garlic. Would you like me to send the full recipe to your phone?";
-      responseMsg.intent = "KNOWLEDGE_QA";
-      setSystemState(prev => ({ ...prev, isProcessing: false }));
-    } else {
-      responseMsg.content = "I can help you with cooking, recipes, or general questions. Try saying 'Start cooking' or 'Find a recipe'.";
-      responseMsg.intent = "GENERAL_CHAT";
+
+      } else {
+        console.error("Chat request failed");
+      }
+    } catch (error) {
+      console.error("Chat error", error);
+    } finally {
       setSystemState(prev => ({ ...prev, isProcessing: false }));
     }
-
-    setMessages(prev => [...prev, responseMsg]);
   };
 
   const toggleListening = () => {
@@ -143,129 +234,216 @@ export default function Home() {
     }
   };
 
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
+
   return (
-    <div className="min-h-screen flex flex-col p-4 lg:p-8 gap-6 relative overflow-hidden">
-      {/* Header */}
-      <header className="flex items-center justify-between z-10">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/20">
-            <Sparkles className="text-white w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">AI Voice Solution</h1>
-            <p className="text-sm text-white/40 font-mono">SEMANTIC UNDERSTANDING DEMO</p>
-          </div>
+    <div className="min-h-screen flex bg-background text-foreground overflow-hidden transition-colors duration-300">
+      {/* Sidebar */}
+      <aside className="w-64 border-r border-border bg-card/50 flex flex-col">
+        <div className="p-4 border-b border-border flex items-center gap-2">
+           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+             <Sparkles className="text-primary-foreground w-5 h-5" />
+           </div>
+           <span className="font-bold text-lg">AI Voice</span>
         </div>
-        <div className="flex items-center gap-4">
-          <Link href="/knowledge-base">
-            <Button variant="ghost" className="text-white hover:bg-white/10">
-              <Book className="w-4 h-4 mr-2" />
-              Knowledge Base
-            </Button>
-          </Link>
-          <Link href="/instructions">
-            <Button variant="ghost" className="text-white hover:bg-white/10">
-              <Settings className="w-4 h-4 mr-2" />
-              Instructions
-            </Button>
-          </Link>
-          <Link href="/batch-eval">
-            <Button variant="ghost" className="text-white hover:bg-white/10">
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-              Batch Eval
-            </Button>
-          </Link>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-green-400">
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            SYSTEM ONLINE
-          </div>
-          <Button 
+        
+        <div className="p-4">
+          <Button onClick={createSession} className="w-full justify-start gap-2" variant="outline">
+            <Plus className="w-4 h-4" />
+            新建对话
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-2 space-y-1">
+          {sessions.map(session => (
+            <div 
+              key={session.id}
+              className={cn(
+                "group flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-accent/50 transition-colors",
+                currentSessionId === session.id ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+              )}
+              onClick={() => selectSession(session.id)}
+            >
+              <div className="flex items-center gap-2 overflow-hidden">
+                <MessageSquare className="w-4 h-4 flex-shrink-0" />
+                <span className="truncate text-sm">{session.name}</span>
+              </div>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100">
+                    <MoreVertical className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSessionToRename(session); setNewName(session.name); setIsRenameDialogOpen(true); }}>
+                    <Edit2 className="w-3 h-3 mr-2" />
+                    重命名
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }} className="text-destructive">
+                    <Trash className="w-3 h-3 mr-2" />
+                    删除
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ))}
+        </div>
+
+        <div className="p-4 border-t border-border space-y-2">
+           <Button variant="ghost" className="w-full justify-start" onClick={toggleTheme}>
+             {theme === 'dark' ? <Sun className="w-4 h-4 mr-2" /> : <Moon className="w-4 h-4 mr-2" />}
+             {theme === 'dark' ? '亮色模式' : '暗色模式'}
+           </Button>
+           <Button 
             variant="ghost" 
-            size="icon" 
+            className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
             onClick={() => {
               localStorage.removeItem("token");
               setLocation("/login");
-            }} 
-            className="text-white/60 hover:text-white hover:bg-white/10" 
-            title="Logout"
+            }}
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-4 h-4 mr-2" />
+            退出登录
           </Button>
         </div>
-      </header>
+      </aside>
 
-      {/* Main Content Grid */}
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 z-10">
-        
-        {/* Left Column: Interaction Area */}
-        <div className="lg:col-span-7 flex flex-col gap-6">
-          {/* Voice Orb / Visualizer */}
-          <div className="flex-1 glass-card relative min-h-[400px] flex flex-col items-center justify-center overflow-hidden">
-            <VoiceVisualizer 
-              isActive={systemState.isListening} 
-              isProcessing={systemState.isProcessing} 
-            />
-            
-            <div className="relative z-10 text-center space-y-6">
-              <div className={cn(
-                "text-4xl font-light transition-all duration-500",
-                systemState.isListening ? "text-white scale-110" : "text-white/50"
-              )}>
-                {systemState.isListening ? "Listening..." : 
-                 systemState.isProcessing ? "Processing..." : 
-                 "Tap to Speak"}
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+        <header className="h-14 border-b border-border flex items-center justify-between px-6 bg-card/50 backdrop-blur">
+           <div className="flex items-center gap-4">
+             <h2 className="font-semibold">
+               {sessions.find(s => s.id === currentSessionId)?.name || "新建对话"}
+             </h2>
+           </div>
+           <div className="flex items-center gap-2">
+              <Link href="/knowledge-base">
+                <Button variant="ghost" size="sm">
+                  <Book className="w-4 h-4 mr-2" />
+                  知识库
+                </Button>
+              </Link>
+              <Link href="/instructions">
+                <Button variant="ghost" size="sm">
+                  <Settings className="w-4 h-4 mr-2" />
+                  指令管理
+                </Button>
+              </Link>
+              <Link href="/batch-eval">
+                <Button variant="ghost" size="sm">
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  批量评测
+                </Button>
+              </Link>
+           </div>
+        </header>
+
+        <main className="flex-1 overflow-hidden flex p-6 gap-6">
+           {/* Chat Area */}
+           <div className="flex-1 flex flex-col gap-6 max-w-4xl mx-auto w-full">
+              <div className="flex-1 bg-card/30 rounded-2xl border border-border p-6 relative overflow-hidden flex flex-col items-center justify-center">
+                 <VoiceVisualizer 
+                    isActive={systemState.isListening} 
+                    isProcessing={systemState.isProcessing} 
+                  />
+                  <div className="relative z-10 text-center space-y-6 mt-8">
+                    <div className={cn(
+                      "text-4xl font-light transition-all duration-500",
+                      systemState.isListening ? "text-primary scale-110" : "text-muted-foreground"
+                    )}>
+                      {systemState.isListening ? "正在聆听..." : 
+                       systemState.isProcessing ? "正在处理..." : 
+                       "点击说话"}
+                    </div>
+                    
+                    <Button 
+                      size="lg"
+                      className={cn(
+                        "w-20 h-20 rounded-full transition-all duration-300 shadow-xl",
+                        systemState.isListening 
+                          ? "bg-destructive hover:bg-destructive/90 animate-pulse" 
+                          : "bg-primary hover:bg-primary/90"
+                      )}
+                      onClick={toggleListening}
+                    >
+                      {systemState.isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
+                    </Button>
+                  </div>
+
+                  {/* Quick Prompts */}
+                  <div className="absolute bottom-6 left-0 right-0 px-6 flex gap-2 justify-center overflow-x-auto pb-2 scrollbar-hide">
+                    {SAMPLE_PROMPTS.map((prompt, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleSendMessage(prompt)}
+                        className="whitespace-nowrap px-4 py-2 rounded-full bg-accent/50 border border-border text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
               </div>
-              
-              <Button 
-                size="lg"
-                className={cn(
-                  "w-20 h-20 rounded-full transition-all duration-300 shadow-xl",
-                  systemState.isListening 
-                    ? "bg-red-500 hover:bg-red-600 shadow-red-500/30 animate-pulse" 
-                    : "bg-primary hover:bg-primary/90 shadow-primary/30"
-                )}
-                onClick={toggleListening}
-              >
-                {systemState.isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
-              </Button>
-            </div>
 
-            {/* Quick Prompts */}
-            <div className="absolute bottom-6 left-0 right-0 px-6 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-              {SAMPLE_PROMPTS.map((prompt, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleSendMessage(prompt)}
-                  className="whitespace-nowrap px-4 py-2 rounded-full bg-white/5 border border-white/10 text-sm text-white/70 hover:bg-white/10 hover:border-white/20 transition-colors"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
+              {/* Chat History & Input */}
+              <div className="flex-1 flex flex-col gap-4 min-h-0">
+                 <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+                    {messages.map(msg => (
+                      <div key={msg.id} className={cn("flex gap-3", msg.role === 'user' ? "justify-end" : "justify-start")}>
+                        <div className={cn(
+                          "max-w-[80%] p-3 rounded-2xl text-sm",
+                          msg.role === 'user' 
+                            ? "bg-primary text-primary-foreground rounded-tr-none" 
+                            : "bg-muted text-muted-foreground rounded-tl-none"
+                        )}>
+                          {msg.content}
+                          {msg.latency && (
+                            <div className="text-[10px] opacity-50 mt-1">
+                              Latency: {msg.latency}ms | Intent: {msg.intent}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                 </div>
 
-          {/* Text Input Fallback */}
-          <div className="glass-card p-2 flex gap-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage(input)}
-              placeholder="Or type a command..."
-              className="flex-1 bg-transparent border-none text-white placeholder:text-white/30 focus:ring-0 px-4"
-            />
-            <Button size="icon" onClick={() => handleSendMessage(input)} className="rounded-xl">
-              <Send className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
+                 <div className="bg-card border border-border rounded-xl p-2 flex gap-2">
+                    <Input
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSendMessage(input)}
+                      placeholder="输入指令..."
+                      className="border-none focus-visible:ring-0 bg-transparent"
+                    />
+                    <Button size="icon" onClick={() => handleSendMessage(input)}>
+                      <Send className="w-4 h-4" />
+                    </Button>
+                 </div>
+              </div>
+           </div>
 
-        {/* Right Column: System Internals */}
-        <div className="lg:col-span-5 flex flex-col gap-6">
-          <MicrowaveStatus state={systemState.microwaveState} />
-          <JsonLogger messages={messages} />
-        </div>
-      </main>
+           {/* Right Panel */}
+           <div className="w-80 flex flex-col gap-6">
+              <MicrowaveStatus state={systemState.microwaveState} />
+              <JsonLogger messages={messages} />
+           </div>
+        </main>
+      </div>
+
+      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>重命名会话</DialogTitle>
+          </DialogHeader>
+          <Input value={newName} onChange={(e) => setNewName(e.target.value)} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRenameDialogOpen(false)}>取消</Button>
+            <Button onClick={renameSession}>保存</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

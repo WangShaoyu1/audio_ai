@@ -39,9 +39,9 @@ export default function BatchEval() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      toast.success("Batch evaluation completed and result downloaded");
+      toast.success("批量评测完成，结果已下载");
     } catch (error) {
-      toast.error("Failed to run batch evaluation");
+      toast.error("批量评测失败");
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -50,13 +50,13 @@ export default function BatchEval() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <h1 className="text-3xl font-bold">Batch Evaluation</h1>
+      <h1 className="text-3xl font-bold">批量评测</h1>
 
       <Card>
         <CardHeader>
-          <CardTitle>Run Batch Evaluation</CardTitle>
+          <CardTitle>运行批量评测</CardTitle>
           <CardDescription>
-            Upload an Excel file containing test cases. The system will process each case and generate a report.
+            上传包含测试用例的 Excel 文件。系统将处理每个用例并生成报告。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -67,13 +67,13 @@ export default function BatchEval() {
               </div>
             </div>
             <div>
-              <h3 className="text-lg font-medium">Upload Test Cases</h3>
+              <h3 className="text-lg font-medium">上传测试用例</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Supported format: .xlsx
+                支持格式: .xlsx
               </p>
               <Button variant="link" className="text-sm h-auto p-0 mt-2" onClick={() => window.open("/api/v1/templates/batch-eval", "_blank")}>
                 <Download className="w-3 h-3 mr-1" />
-                Download Template
+                下载模板
               </Button>
             </div>
             <div className="flex justify-center">
@@ -87,21 +87,21 @@ export default function BatchEval() {
                 />
                 <Button disabled={uploading}>
                   <Upload className="w-4 h-4 mr-2" />
-                  {uploading ? "Processing..." : "Select File"}
+                  {uploading ? "处理中..." : "选择文件"}
                 </Button>
               </div>
             </div>
           </div>
 
           <div className="bg-muted p-4 rounded-lg">
-            <h4 className="font-medium mb-2">Template Format</h4>
+            <h4 className="font-medium mb-2">模板格式说明</h4>
             <p className="text-sm text-muted-foreground mb-2">
-              The Excel file should have the following columns:
+              Excel 文件应包含以下列：
             </p>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-              <li><strong>query</strong>: The user input text</li>
-              <li><strong>expected_intent</strong>: (Optional) The expected intent name</li>
-              <li><strong>expected_slots</strong>: (Optional) JSON string of expected slots</li>
+              <li><strong>query</strong>: 用户输入的文本</li>
+              <li><strong>expected_intent</strong>: (可选) 预期的意图名称</li>
+              <li><strong>expected_slots</strong>: (可选) 预期槽位的 JSON 字符串</li>
             </ul>
           </div>
         </CardContent>

@@ -4,7 +4,7 @@ from sqlalchemy.future import select
 from sqlalchemy import update, delete
 from app.db.session import get_db
 from app.api.deps import get_current_user
-from app.models.base import User, ChatSession
+from app.models.base import User, Session as ChatSession
 from pydantic import BaseModel
 from typing import List
 
@@ -26,14 +26,14 @@ async def list_sessions(
     result = await db.execute(
         select(ChatSession)
         .filter(ChatSession.user_id == current_user.id)
-        .order_by(ChatSession.created_at.desc())
+        .order_by(ChatSession.start_time.desc())
     )
     sessions = result.scalars().all()
     return [
         {
             "id": str(s.id),
             "name": s.name or "New Chat",
-            "created_at": s.created_at.isoformat()
+            "created_at": s.start_time.isoformat()
         }
         for s in sessions
     ]
