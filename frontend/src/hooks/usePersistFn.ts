@@ -9,9 +9,9 @@ export function usePersistFn<T extends noop>(fn: T) {
   const fnRef = useRef<T>(fn);
   fnRef.current = fn;
 
-  const persistFn = useRef<T>(null);
+  const persistFn = useRef<T | null>(null);
   if (!persistFn.current) {
-    persistFn.current = function (this: unknown, ...args) {
+    persistFn.current = function (this: unknown, ...args: any[]) {
       return fnRef.current!.apply(this, args);
     } as T;
   }

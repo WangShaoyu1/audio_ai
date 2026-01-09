@@ -10,7 +10,7 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [location] = useLocation();
-  const { theme, setTheme } = useTheme();
+  const { theme, toggleTheme: contextToggleTheme } = useTheme();
 
   const navItems = [
     { path: '/', label: '聊天调试', icon: MessageSquare },
@@ -25,7 +25,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
+    if (contextToggleTheme) {
+      contextToggleTheme();
+    }
   };
 
   return (

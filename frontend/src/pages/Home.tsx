@@ -1,10 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, Send, Sparkles, Terminal, Book, FileSpreadsheet, Settings, LogOut, Plus, MessageSquare, MoreVertical, Trash, Edit2, Sun, Moon } from "lucide-react";
-import { Link, useLocation } from "wouter";
-import { Message, SystemState, SAMPLE_PROMPTS } from '@/lib/types';
-import VoiceVisualizer from '@/components/VoiceVisualizer';
-import MicrowaveStatus from '@/components/MicrowaveStatus';
+import { Send, Plus, MessageSquare, MoreVertical, Trash, Edit2 } from "lucide-react";
+import { useLocation } from "wouter";
+import { Message } from '@/lib/types';
 import JsonLogger from '@/components/JsonLogger';
 import { cn } from '@/lib/utils';
 import {
@@ -29,7 +27,7 @@ interface Session {
 }
 
 export default function Home() {
-  const [, setLocation] = useLocation();
+  useLocation();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isStream, setIsStream] = useState(true);
@@ -38,35 +36,12 @@ export default function Home() {
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [sessionToRename, setSessionToRename] = useState<Session | null>(null);
   const [newName, setNewName] = useState("");
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
-  const [systemState, setSystemState] = useState<SystemState>({
-    isListening: false,
-    isProcessing: false,
-    currentIntent: null,
-    activeFunction: null,
-    microwaveState: {
-      status: 'idle',
-      mode: null,
-      temperature: null,
-      duration: null,
-      remaining: null,
-      firepower: null
-    }
-  });
+  const [, setIsProcessing] = useState(false);
 
   useEffect(() => {
     fetchSessions();
-    // Check system theme preference
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
-      setTheme('light');
-    }
   }, []);
-
-  useEffect(() => {
-    document.documentElement.classList.remove('light', 'dark');
-    document.documentElement.classList.add(theme);
-  }, [theme]);
 
   const fetchSessions = async () => {
     try {
@@ -90,16 +65,10 @@ export default function Home() {
   const createSession = () => {
     setCurrentSessionId(null);
     setMessages([]);
-    // Ideally, we create the session on the backend when the first message is sent, 
-    // or explicitly create it here. For now, we just clear the UI state.
   };
 
   const selectSession = async (sessionId: string) => {
     setCurrentSessionId(sessionId);
-    // Fetch messages for this session (not implemented in backend yet, so we just clear for now or need to implement message history fetch)
-    // For now, we assume history is loaded via chat context or separate endpoint.
-    // Since we don't have a message history endpoint, we start fresh or need to add one.
-    // Let's assume we start fresh for demo purposes or need to implement it.
     setMessages([]); 
   };
 
@@ -155,7 +124,7 @@ export default function Home() {
     
     setMessages(prev => [...prev, userMsg]);
     setInput('');
-    setSystemState(prev => ({ ...prev, isProcessing: true }));
+    setIsProcessing(true);
     
     try {
       const token = localStorage.getItem("token");
@@ -176,10 +145,7 @@ export default function Home() {
         const data = await res.json();
         const result = data.data;
         
-        // Update session ID if it was new
         if (!currentSessionId && result.metadata?.trace_id) {
-           // The backend doesn't return session_id in the response structure defined in endpoints.py
-           // We might need to refresh sessions list to get the new session
            fetchSessions();
         }
 
@@ -195,49 +161,14 @@ export default function Home() {
         
         setMessages(prev => [...prev, assistantMsg]);
         
-        // Update system state based on actions
-        if (result.actions && result.actions.length > 0) {
-           // Handle mock actions
-           const action = result.actions[0];
-           if (action.type === 'mock_instruction') {
-             // Parse payload to update microwave state (simple heuristic)
-             if (action.payload.includes('start')) {
-                setSystemState(prev => ({
-                  ...prev,
-                  microwaveState: { ...prev.microwaveState, status: 'cooking', remaining: 300 }
-                }));
-             } else if (action.payload.includes('pause')) {
-                setSystemState(prev => ({
-                  ...prev,
-                  microwaveState: { ...prev.microwaveState, status: 'paused' }
-                }));
-             }
-           }
-        }
-
       } else {
         console.error("Chat request failed");
       }
     } catch (error) {
       console.error("Chat error", error);
     } finally {
-      setSystemState(prev => ({ ...prev, isProcessing: false }));
+      setIsProcessing(false);
     }
-  };
-
-  const toggleListening = () => {
-    setSystemState(prev => ({ ...prev, isListening: !prev.isListening }));
-    if (!systemState.isListening) {
-      // Simulate voice input after 3 seconds
-      setTimeout(() => {
-        setSystemState(prev => ({ ...prev, isListening: false }));
-        handleSendMessage(SAMPLE_PROMPTS[Math.floor(Math.random() * SAMPLE_PROMPTS.length)]);
-      }, 3000);
-    }
-  };
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
   return (
@@ -290,8 +221,6 @@ export default function Home() {
             </div>
           ))}
         </div>
-
-
       </aside>
 
       {/* Main Content */}
@@ -302,55 +231,10 @@ export default function Home() {
                {sessions.find(s => s.id === currentSessionId)?.name || "新建对话"}
              </h2>
            </div>
-
         </header>
 
         <main className="flex-1 overflow-hidden flex p-6 gap-6">
-           {/* Chat Area */}
            <div className="flex-1 flex flex-col gap-6 max-w-4xl mx-auto w-full">
-              <div className="flex-1 bg-card/30 rounded-2xl border border-border p-6 relative overflow-hidden flex flex-col items-center justify-center">
-                 <VoiceVisualizer 
-                    isActive={systemState.isListening} 
-                    isProcessing={systemState.isProcessing} 
-                  />
-                  <div className="relative z-10 text-center space-y-6 mt-8">
-                    <div className={cn(
-                      "text-4xl font-light transition-all duration-500",
-                      systemState.isListening ? "text-primary scale-110" : "text-muted-foreground"
-                    )}>
-                      {systemState.isListening ? "正在聆听..." : 
-                       systemState.isProcessing ? "正在处理..." : 
-                       "点击说话"}
-                    </div>
-                    
-                    <Button 
-                      size="lg"
-                      className={cn(
-                        "w-20 h-20 rounded-full transition-all duration-300 shadow-xl",
-                        systemState.isListening 
-                          ? "bg-destructive hover:bg-destructive/90 animate-pulse" 
-                          : "bg-primary hover:bg-primary/90"
-                      )}
-                      onClick={toggleListening}
-                    >
-                      {systemState.isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
-                    </Button>
-                  </div>
-
-                  {/* Quick Prompts */}
-                  <div className="absolute bottom-6 left-0 right-0 px-6 flex gap-2 justify-center overflow-x-auto pb-2 scrollbar-hide">
-                    {SAMPLE_PROMPTS.map((prompt, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleSendMessage(prompt)}
-                        className="whitespace-nowrap px-4 py-2 rounded-full bg-accent/50 border border-border text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                      >
-                        {prompt}
-                      </button>
-                    ))}
-                  </div>
-              </div>
-
               {/* Chat History & Input */}
               <div className="flex-1 flex flex-col gap-4 min-h-0">
                  <div className="flex-1 overflow-y-auto space-y-4 pr-2">
@@ -401,7 +285,6 @@ export default function Home() {
 
            {/* Right Panel */}
            <div className="w-80 flex flex-col gap-6">
-              <MicrowaveStatus state={systemState.microwaveState} />
               <JsonLogger messages={messages} />
            </div>
         </main>

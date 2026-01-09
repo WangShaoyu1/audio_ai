@@ -13,8 +13,8 @@ import Layout from "@/components/Layout";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
 
-function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const [location, setLocation] = useLocation();
+function ProtectedRoute({ component: Component }: { component: React.ComponentType<any> }) {
+  const [, setLocation] = useLocation();
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -67,7 +67,7 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider
         defaultTheme="light"
-        // switchable
+        switchable
       >
         <TooltipProvider>
           <Toaster />
