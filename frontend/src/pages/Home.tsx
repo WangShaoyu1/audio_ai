@@ -32,6 +32,7 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
+  const [isStream, setIsStream] = useState(true);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
@@ -167,7 +168,7 @@ export default function Home() {
         body: JSON.stringify({
           session_id: currentSessionId,
           query: text,
-          stream: false
+          stream: isStream
         })
       });
 
@@ -274,7 +275,7 @@ export default function Home() {
               
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100">
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground">
                     <MoreVertical className="w-3 h-3" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -421,6 +422,17 @@ export default function Home() {
                     <Button size="icon" onClick={() => handleSendMessage(input)}>
                       <Send className="w-4 h-4" />
                     </Button>
+                 </div>
+                 <div className="flex items-center gap-2 px-2">
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={isStream} 
+                        onChange={(e) => setIsStream(e.target.checked)}
+                        className="rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      流式响应
+                    </label>
                  </div>
               </div>
            </div>

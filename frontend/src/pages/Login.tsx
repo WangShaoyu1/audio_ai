@@ -30,6 +30,11 @@ export default function Login() {
         body: JSON.stringify({ phone }),
       });
 
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Backend not reachable (Received HTML instead of JSON). Please ensure the backend server is running.");
+      }
+
       const data = await response.json();
 
       if (!response.ok) {
