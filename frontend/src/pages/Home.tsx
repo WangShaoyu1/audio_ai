@@ -105,12 +105,18 @@ export default function Home() {
       });
       if (res.ok) {
         const history = await res.json();
-        setMessages(history.map((msg: any) => ({
-          id: msg.timestamp, // Use timestamp as temporary ID
-          role: msg.role,
-          content: msg.content,
-          timestamp: new Date(msg.timestamp).getTime()
-        })));
+        // Ensure history is an array and map correctly
+        if (Array.isArray(history)) {
+          setMessages(history.map((msg: any) => ({
+            id: msg.id || msg.timestamp || Date.now().toString(),
+            role: msg.role,
+            content: msg.content,
+            timestamp: msg.timestamp ? new Date(msg.timestamp).getTime() : Date.now(),
+            intent: msg.intent,
+            latency: msg.latency,
+            metadata: msg.metadata
+          })));
+        }
       }
     } catch (error) {
       console.error("Failed to load session history", error);
@@ -186,7 +192,72 @@ export default function Home() {
         })
       });
 
-      if (res.ok) {
+      if (!res.ok) {
+        console.error("Chat request failed");
+        setIsProcessing(false);
+        return;
+      }
+
+      if (isStream && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let assistantMsg: Message = {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: '',
+          timestamp: Date.now()
+        };
+        
+        setMessages(prev => [...prev, assistantMsg]);
+        
+        let buffer = '';
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const dataStr = line.slice(6);
+              if (dataStr === '[DONE]') continue;
+              
+              try {
+                const data = JSON.parse(dataStr);
+                if (data.content) {
+                  assistantMsg = {
+                    ...assistantMsg,
+                    content: assistantMsg.content + data.content
+                  };
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === assistantMsg.id ? assistantMsg : msg
+                  ));
+                }
+                if (data.metadata) {
+                  assistantMsg = {
+                    ...assistantMsg,
+                    latency: data.metadata.latency?.total_ms,
+                    intent: data.metadata.route,
+                    metadata: data.metadata
+                  };
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === assistantMsg.id ? assistantMsg : msg
+                  ));
+                  
+                  if (!currentSessionId && data.metadata.trace_id) {
+                    fetchSessions();
+                  }
+                }
+              } catch (e) {
+                console.error("Error parsing stream data", e);
+              }
+            }
+          }
+        }
+      } else {
         const data = await res.json();
         const result = data.data;
         
@@ -205,9 +276,6 @@ export default function Home() {
         };
         
         setMessages(prev => [...prev, assistantMsg]);
-        
-      } else {
-        console.error("Chat request failed");
       }
     } catch (error) {
       console.error("Chat error", error);
@@ -269,23 +337,31 @@ export default function Home() {
                 )}
                 onClick={() => selectSession(session.id)}
               >
-                <div className="flex items-center gap-2 overflow-hidden">
+                <div className="flex items-center gap-2 overflow-hidden flex-1">
                   <MessageSquare className="w-4 h-4 flex-shrink-0" />
                   <span className="truncate text-sm">{session.name}</span>
                 </div>
                 
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground">
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0">
                       <MoreVertical className="w-3 h-3" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSessionToRename(session); setNewName(session.name); setIsRenameDialogOpen(true); }}>
+                    <DropdownMenuItem onClick={(e) => { 
+                      e.stopPropagation(); 
+                      setSessionToRename(session); 
+                      setNewName(session.name); 
+                      setIsRenameDialogOpen(true); 
+                    }}>
                       <Edit2 className="w-3 h-3 mr-2" />
                       重命名
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }} className="text-destructive">
+                    <DropdownMenuItem onClick={(e) => { 
+                      e.stopPropagation(); 
+                      deleteSession(session.id); 
+                    }} className="text-destructive">
                       <Trash className="w-3 h-3 mr-2" />
                       删除
                     </DropdownMenuItem>
