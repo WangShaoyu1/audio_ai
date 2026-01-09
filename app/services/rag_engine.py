@@ -1,5 +1,6 @@
 from typing import List, Dict, Any
 from langchain_openai import OpenAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.base import DocumentChunk, Document
@@ -7,15 +8,30 @@ from app.models.rag_config import RAGConfig
 from app.core.config import settings
 import logging
 import uuid
+import random
 
 logger = logging.getLogger(__name__)
+
+class MockEmbeddings:
+    async def aembed_query(self, text: str) -> List[float]:
+        # Return a random vector of size 1536
+        return [random.random() for _ in range(1536)]
+
+    async def aembed_documents(self, texts: List[str]) -> List[List[float]]:
+        return [await self.aembed_query(text) for text in texts]
 
 class RAGEngine:
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.embeddings = OpenAIEmbeddings(
-            api_key=settings.OPENAI_API_KEY,
-            base_url=settings.OPENAI_API_BASE
+        logger.info(f"OPENAI_API_KEY present: {bool(settings.OPENAI_API_KEY)}")
+        # Force MockEmbeddings for debugging
+        logger.warning("Forcing MockEmbeddings for debugging.")
+        self.embeddings = MockEmbeddings()
+        
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            length_function=len,
         )
     
     async def get_config(self, user_id: uuid.UUID) -> RAGConfig:
@@ -61,14 +77,18 @@ class RAGEngine:
 
     async def index_document(self, doc_id: str, content: str):
         """
-        Simple indexing logic: split by newline and save
+        Index document content using RecursiveCharacterTextSplitter
         """
+        logger.info(f"Starting indexing for doc_id: {doc_id}")
         try:
-            chunks = content.split('\n\n')
+            chunks = self.text_splitter.split_text(content)
+            logger.info(f"Split content into {len(chunks)} chunks")
+            
             for idx, text in enumerate(chunks):
                 if not text.strip():
                     continue
-                    
+                
+                logger.info(f"Embedding chunk {idx}")
                 embedding = await self.embeddings.aembed_query(text)
                 chunk = DocumentChunk(
                     doc_id=doc_id,
@@ -78,7 +98,10 @@ class RAGEngine:
                 )
                 self.db.add(chunk)
             
+            logger.info("Committing chunks to database")
             await self.db.commit()
+            logger.info("Indexing completed successfully")
         except Exception as e:
             logger.error(f"Indexing Error: {e}")
             await self.db.rollback()
+            raise e

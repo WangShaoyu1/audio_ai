@@ -98,11 +98,27 @@ async def upload_document(
     db.add(doc)
     await db.commit()
     
-    # 2. Read content (Simplified: assume text file)
-    try:
-        content = (await file.read()).decode("utf-8")
-    except UnicodeDecodeError:
-        content = "Binary file content placeholder"
+    # 2. Read content
+    content = ""
+    file_content = await file.read()
+    
+    if file.filename.lower().endswith('.pdf'):
+        import io
+        from pypdf import PdfReader
+        try:
+            pdf_file = io.BytesIO(file_content)
+            reader = PdfReader(pdf_file)
+            text_content = []
+            for page in reader.pages:
+                text_content.append(page.extract_text())
+            content = "\n".join(text_content)
+        except Exception as e:
+            content = f"Error reading PDF: {str(e)}"
+    else:
+        try:
+            content = file_content.decode("utf-8")
+        except UnicodeDecodeError:
+            content = "Binary file content placeholder"
     
     # 3. Indexing
     rag = RAGEngine(db)
