@@ -25,25 +25,27 @@ const MessageBubble = ({ role, content, metadata }) => {
         </div>
         
         {!isUser && metadata && (
-          <div className="mt-2 text-xs text-muted-foreground grid grid-cols-2 gap-2 bg-muted/30 p-2 rounded border border-border/50">
-            <div className="flex items-center gap-1" title={t('chat.latency')}>
-              <Clock className="h-3 w-3" />
-              <span>{metadata.latency?.total_ms || 0}ms</span>
-            </div>
-            <div className="flex items-center gap-1" title={t('chat.route')}>
-              <Map className="h-3 w-3" />
-              <span className="uppercase font-semibold text-primary">{metadata.route}</span>
-            </div>
-            <div className="flex items-center gap-1 col-span-2" title={t('chat.model')}>
-              <Cpu className="h-3 w-3" />
-              <span>{metadata.models_used?.executor || 'N/A'}</span>
-            </div>
-            {metadata.search_results?.length > 0 && (
-              <div className="col-span-2 text-blue-500 flex items-center gap-1">
-                <Search className="h-3 w-3" />
-                <span>{metadata.search_results.length} sources found</span>
+          <div className="mt-1 text-xs text-muted-foreground bg-muted/30 p-2 rounded border border-border/50">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="flex items-center gap-1" title={t('chat.latency')}>
+                <Clock className="h-3 w-3" />
+                <span>{metadata.latency?.total_ms || 0}ms</span>
               </div>
-            )}
+              <div className="flex items-center gap-1" title={t('chat.route')}>
+                <Map className="h-3 w-3" />
+                <span className="uppercase font-semibold text-primary">{metadata.route}</span>
+              </div>
+              <div className="flex items-center gap-1" title={t('chat.model')}>
+                <Cpu className="h-3 w-3" />
+                <span>{metadata.models_used?.executor || 'N/A'}</span>
+              </div>
+              {metadata.search_results?.length > 0 && (
+                <div className="col-span-2 text-blue-500 flex items-center gap-1">
+                  <Search className="h-3 w-3" />
+                  <span>{metadata.search_results.length} sources found</span>
+                </div>
+              )}
+              </div>
           </div>
         )}
       </div>
@@ -56,7 +58,7 @@ const ChatDebugger = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
-  
+
   // Session Management
   const [sessions, setSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
@@ -115,7 +117,7 @@ const ChatDebugger = () => {
 
   const updateCurrentSessionMessages = (newMessages) => {
     setMessages(newMessages);
-    setSessions(prev => prev.map(s => 
+    setSessions(prev => prev.map(s =>
       s.id === currentSessionId ? { ...s, messages: newMessages } : s
     ));
   };
@@ -144,7 +146,7 @@ const ChatDebugger = () => {
         query: userMsg.content,
         stream: false
       });
-      
+
       if (data.code === 0) {
         const aiMsg = {
           role: 'assistant',
@@ -155,8 +157,8 @@ const ChatDebugger = () => {
       }
     } catch (error) {
       console.error('Chat error:', error);
-      updateCurrentSessionMessages([...newMessages, { 
-        role: 'assistant', 
+      updateCurrentSessionMessages([...newMessages, {
+        role: 'assistant',
         content: `${t('common.error')}: ${error.message}`,
         isError: true
       }]);
@@ -166,7 +168,7 @@ const ChatDebugger = () => {
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex gap-4">
+    <div className="h-[calc(100vh-7rem)] flex gap-4">
       {/* Sidebar: Session List */}
       <Card className="w-64 flex flex-col border-border shadow-sm">
         <CardHeader className="p-4 border-b border-border">
