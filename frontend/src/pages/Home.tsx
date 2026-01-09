@@ -241,14 +241,11 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen flex bg-background text-foreground overflow-hidden transition-colors duration-300">
+    <div className="h-full flex bg-background text-foreground overflow-hidden">
       {/* Sidebar */}
       <aside className="w-64 border-r border-border bg-card/50 flex flex-col">
-        <div className="p-4 border-b border-border flex items-center gap-2">
-           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-             <Sparkles className="text-primary-foreground w-5 h-5" />
-           </div>
-           <span className="font-bold text-lg">AI Voice</span>
+        <div className="p-4 border-b border-border">
+           <Input placeholder="搜索会话..." className="h-9" />
         </div>
         
         <div className="p-4">
@@ -294,23 +291,7 @@ export default function Home() {
           ))}
         </div>
 
-        <div className="p-4 border-t border-border space-y-2">
-           <Button variant="ghost" className="w-full justify-start" onClick={toggleTheme}>
-             {theme === 'dark' ? <Sun className="w-4 h-4 mr-2" /> : <Moon className="w-4 h-4 mr-2" />}
-             {theme === 'dark' ? '亮色模式' : '暗色模式'}
-           </Button>
-           <Button 
-            variant="ghost" 
-            className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={() => {
-              localStorage.removeItem("token");
-              setLocation("/login");
-            }}
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            退出登录
-          </Button>
-        </div>
+
       </aside>
 
       {/* Main Content */}
@@ -321,26 +302,7 @@ export default function Home() {
                {sessions.find(s => s.id === currentSessionId)?.name || "新建对话"}
              </h2>
            </div>
-           <div className="flex items-center gap-2">
-              <Link href="/knowledge-base">
-                <Button variant="ghost" size="sm">
-                  <Book className="w-4 h-4 mr-2" />
-                  知识库
-                </Button>
-              </Link>
-              <Link href="/instructions">
-                <Button variant="ghost" size="sm">
-                  <Settings className="w-4 h-4 mr-2" />
-                  指令管理
-                </Button>
-              </Link>
-              <Link href="/batch-eval">
-                <Button variant="ghost" size="sm">
-                  <FileSpreadsheet className="w-4 h-4 mr-2" />
-                  批量评测
-                </Button>
-              </Link>
-           </div>
+
         </header>
 
         <main className="flex-1 overflow-hidden flex p-6 gap-6">

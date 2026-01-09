@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import Instructions from "./pages/Instructions";
 import BatchEval from "./pages/BatchEval";
+import Layout from "@/components/Layout";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
 
@@ -26,7 +27,11 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
     return null;
   }
 
-  return <Component />;
+  return (
+    <Layout>
+      <Component />
+    </Layout>
+  );
 }
 
 function Router() {
