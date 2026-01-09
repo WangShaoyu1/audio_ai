@@ -12,6 +12,7 @@ export interface Message {
   };
   latency?: number;
   confidence?: number;
+  metadata?: any;
 }
 
 export interface SystemState {

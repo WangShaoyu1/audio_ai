@@ -56,6 +56,13 @@ export default function JsonLogger({ messages }: JsonLoggerProps) {
                     Latency: {msg.latency}ms | Confidence: {msg.confidence ?? 0.95}
                   </div>
                 )}
+                
+                {msg.metadata && (
+                  <div className="mt-2 p-2 bg-black/40 rounded text-[10px] font-mono overflow-x-auto">
+                    <div className="text-blue-300 mb-1">Full Link Details:</div>
+                    <pre className="text-white/60">{JSON.stringify(msg.metadata, null, 2)}</pre>
+                  </div>
+                )}
               </div>
             </div>
           ))}

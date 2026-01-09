@@ -188,7 +188,8 @@ export default function Home() {
           content: result.content,
           timestamp: Date.now(),
           latency: result.metadata?.latency?.total_ms,
-          intent: result.metadata?.route
+          intent: result.metadata?.route,
+          metadata: result.metadata
         };
         
         setMessages(prev => [...prev, assistantMsg]);
