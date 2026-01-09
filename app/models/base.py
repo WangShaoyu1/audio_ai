@@ -1,52 +1,57 @@
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, String, DateTime, Text, Integer, Boolean, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import Column, String, DateTime, Text, Integer, Boolean, ForeignKey, JSON
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from pgvector.sqlalchemy import Vector
 import uuid
 from datetime import datetime
+
+# Define common types for PostgreSQL
+UUID_TYPE = PG_UUID(as_uuid=True)
+JSON_TYPE = JSONB
+VECTOR_TYPE = Vector(1536)
 
 Base = declarative_base()
 
 class User(Base):
     __tablename__ = "users"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    phone = Column(String, unique=True, index=True, nullable=False)  # Changed from username to phone
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    phone = Column(String, unique=True, index=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)
 
 class Session(Base):
     __tablename__ = "sessions"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False) # Made nullable=False
-    name = Column(String, default="New Chat") # Added session name
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID_TYPE, ForeignKey("users.id"), nullable=False)
+    name = Column(String, default="New Chat")
     start_time = Column(DateTime, default=datetime.utcnow)
     end_time = Column(DateTime, nullable=True)
-    context = Column(JSONB, default={})
+    context = Column(JSON_TYPE, default={})
 
 class Message(Base):
     __tablename__ = "messages"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    session_id = Column(UUID(as_uuid=True), ForeignKey("sessions.id"), nullable=False)
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    session_id = Column(UUID_TYPE, ForeignKey("sessions.id"), nullable=False)
     role = Column(String, nullable=False)
     content = Column(Text, nullable=False)
-    metadata_ = Column(JSONB, default={}) # Renamed from metadata to avoid conflict, stores latency, model, etc.
-    embedding = Column(Vector(1536))
+    metadata_ = Column(JSON_TYPE, default={})
+    embedding = Column(VECTOR_TYPE)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class Document(Base):
     __tablename__ = "documents"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False) # Added user_id
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID_TYPE, ForeignKey("users.id"), nullable=False)
     filename = Column(String, nullable=False)
-    size = Column(String, nullable=True) # Added file size
-    status = Column(String, default="uploaded") # uploaded, indexing, indexed, failed
+    size = Column(String, nullable=True)
+    status = Column(String, default="uploaded")
     error_msg = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    doc_id = Column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False)
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    doc_id = Column(UUID_TYPE, ForeignKey("documents.id"), nullable=False)
     content = Column(Text, nullable=False)
     chunk_index = Column(Integer, nullable=False)
-    embedding = Column(Vector(1536))
+    embedding = Column(VECTOR_TYPE)

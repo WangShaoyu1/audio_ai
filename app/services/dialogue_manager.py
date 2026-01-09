@@ -23,10 +23,13 @@ class DialogueManager:
         trace_id = str(uuid.uuid4())
         
         # Ensure session_id is valid UUID or create new
-        try:
-            uuid.UUID(session_id)
-        except ValueError:
+        if not session_id:
             session_id = str(uuid.uuid4())
+        else:
+            try:
+                uuid.UUID(session_id)
+            except (ValueError, TypeError):
+                session_id = str(uuid.uuid4())
 
         memory = MemoryManager(db)
         rag = RAGEngine(db)

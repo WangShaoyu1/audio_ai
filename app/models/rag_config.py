@@ -1,13 +1,12 @@
 from sqlalchemy import Column, String, Boolean, Float, Integer, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
-from app.models.base import Base
+from app.models.base import Base, UUID_TYPE
 import uuid
 
 class RAGConfig(Base):
     __tablename__ = "rag_configs"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), unique=True, nullable=False)
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID_TYPE, ForeignKey("users.id"), unique=True, nullable=False)
     
     # Indexing Mode: 'high_quality', 'economy'
     index_mode = Column(String, default="high_quality")
