@@ -1,14 +1,26 @@
-# AI Voice Solution (v2.0)
+# AI Voice Solution (v2.1)
 
-Product-level AI voice and semantic understanding system with Admin Dashboard, RAG, and Web Search.
+Commercial-grade AI voice and semantic understanding system with Multi-Tenant Architecture, Advanced RAG, and Admin Dashboard.
 
-## 🌟 New Features (v2.0)
+## 🌟 New Features (v2.1)
 
-*   **Admin Dashboard**: A Manus-style web interface for chat debugging, knowledge management, and batch evaluation.
-*   **Traceability**: Full visibility into model routing, latency (TTFT), and search sources per message.
-*   **Web Search**: Real-time internet access via DuckDuckGo (default), Tavily, or Serper.
-*   **Batch Evaluation**: Automated testing via Excel upload with Pass/Fail metrics.
-*   **Instruction Management**: Bulk import of instructions via Excel.
+*   **Multi-Tenant Architecture**: Full data isolation based on User ID.
+*   **Advanced RAG Engine**: 
+    *   Configurable indexing modes (High Quality / Economy).
+    *   Hybrid retrieval (Vector + Full-Text).
+    *   Rerank support with adjustable Top-K and Score Threshold.
+*   **Instruction Management**: 
+    *   CRUD operations for Function Calling definitions.
+    *   Excel import support.
+    *   Mutex logic validation.
+*   **Batch Evaluation**: 
+    *   Upload Excel test cases.
+    *   Automated intent and keyword matching.
+    *   Downloadable evaluation reports.
+*   **Chat Debugger**: 
+    *   Multi-session management.
+    *   Real-time latency and routing metadata.
+    *   Trace ID tracking.
 
 ## 📚 最佳实践 (Best Practices)
 
@@ -27,7 +39,7 @@ Product-level AI voice and semantic understanding system with Admin Dashboard, R
 pip install -r requirements.txt
 
 # Initialize Database
-python scripts/init_db.py
+python app/db/init_db.py
 
 # Start Server
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000

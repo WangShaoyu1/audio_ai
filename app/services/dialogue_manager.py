@@ -22,6 +22,12 @@ class DialogueManager:
         start_time = time.time()
         trace_id = str(uuid.uuid4())
         
+        # Ensure session_id is valid UUID or create new
+        try:
+            uuid.UUID(session_id)
+        except ValueError:
+            session_id = str(uuid.uuid4())
+
         memory = MemoryManager(db)
         rag = RAGEngine(db)
         
@@ -37,7 +43,7 @@ class DialogueManager:
             "rag_references": []
         }
         
-        # 1. Get Context
+        # 1. Get Context (Scoped to user via session ownership check in MemoryManager)
         history = await memory.get_short_term_memory(session_id)
         
         # 2. Intent Routing
@@ -65,7 +71,8 @@ class DialogueManager:
             llm = LLMFactory.get_llm_for_scenario("rag")
             metadata["models_used"]["executor"] = settings.RAG_LLM_MODEL or settings.DEFAULT_LLM_MODEL
             
-            rag_context = await rag.search(query)
+            # Pass user_id to RAG engine for isolated retrieval
+            rag_context = await rag.search(query, user_id=uuid.UUID(user_id))
             metadata["rag_references"] = rag_context
             
             if not rag_context:
@@ -90,7 +97,7 @@ class DialogueManager:
             else:
                 response_content = await self._generate_chat_response(llm, query, history)
             
-        # 4. Save Memory
+        # 4. Save Memory (Scoped to user)
         await memory.save_message(session_id, "user", query, user_id)
         await memory.save_message(session_id, "assistant", response_content, user_id)
         
@@ -130,7 +137,7 @@ class DialogueManager:
 
     async def _needs_search(self, llm, query: str) -> bool:
         """
-        Determine if the query requires real-time web search.
+        Determine if the query requires real-time information.
         """
         prompt = f"""
         Does the following user query require real-time information from the internet (e.g. weather, news, stock prices, current events)?

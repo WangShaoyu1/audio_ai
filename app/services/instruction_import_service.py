@@ -2,22 +2,21 @@ import pandas as pd
 import io
 import json
 import logging
-from typing import List, Dict
+import uuid
+from typing import List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-# Assuming we have an Instruction model and service
-# from app.models.instruction import Instruction
-# from app.services.instruction_service import InstructionService
+from app.services.instruction_service import InstructionService
 
 logger = logging.getLogger(__name__)
 
 class InstructionImportService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        self.instruction_service = InstructionService(db)
 
-    async def import_from_excel(self, file_content: bytes) -> Dict[str, int]:
+    async def import_from_excel(self, file_content: bytes, user_id: uuid.UUID) -> Dict[str, Any]:
         """
         Import instructions from Excel file.
-        Returns stats: {'total': 10, 'success': 9, 'failed': 1}
         """
         try:
             df = pd.read_excel(io.BytesIO(file_content))
@@ -36,18 +35,27 @@ class InstructionImportService:
                     description = row['description']
                     params_str = row['parameters_json']
                     
-                    # Validate JSON
                     try:
                         parameters = json.loads(params_str)
                     except json.JSONDecodeError:
                         raise ValueError(f"Invalid JSON in parameters_json for {name}")
                     
-                    response_template = row.get('response_template', '')
+                    mutex_config = {}
+                    if 'mutex_config_json' in row:
+                        try:
+                            mutex_config = json.loads(row['mutex_config_json'])
+                        except:
+                            pass
+
+                    data = {
+                        "name": name,
+                        "description": description,
+                        "parameters": parameters,
+                        "mutex_config": mutex_config,
+                        "is_active": True
+                    }
                     
-                    # TODO: Save to DB
-                    # await self.instruction_service.create_instruction(...)
-                    logger.info(f"Importing instruction: {name}")
-                    
+                    await self.instruction_service.create_instruction(data, user_id=user_id)
                     success_count += 1
                     
                 except Exception as e:

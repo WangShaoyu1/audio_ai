@@ -3,6 +3,7 @@ import io
 import asyncio
 import logging
 import time
+import uuid
 from typing import List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.dialogue_manager import DialogueManager
@@ -15,7 +16,7 @@ class EvalService:
         self.db = db
         self.dm = DialogueManager()
 
-    async def run_batch_test(self, file_content: bytes) -> bytes:
+    async def run_batch_test(self, file_content: bytes, user_id: uuid.UUID) -> bytes:
         """
         Process Excel file, run tests, and return result Excel file as bytes.
         """
@@ -35,7 +36,7 @@ class EvalService:
             
             tasks = []
             for _, row in df.iterrows():
-                tasks.append(self._process_single_case(row, sem))
+                tasks.append(self._process_single_case(row, sem, user_id))
             
             results = await asyncio.gather(*tasks)
             
@@ -53,23 +54,21 @@ class EvalService:
             logger.error(f"Batch test failed: {e}")
             raise
 
-    async def _process_single_case(self, row, sem):
+    async def _process_single_case(self, row, sem, user_id: uuid.UUID):
         async with sem:
             case_id = row['case_id']
             query = row['query']
             expected_intent = str(row['expected_intent']).strip().lower()
             expected_keywords = str(row['expected_keywords']).split(',') if pd.notna(row['expected_keywords']) else []
             
-            # Mock user_id and session_id for testing
-            user_id = "eval_user"
-            session_id = f"eval_sess_{case_id}"
+            # Use a temporary session ID for eval
+            session_id = f"eval_{user_id}_{case_id}"
             
             start_time = time.time()
-            ttft_ms = 0 # Placeholder for now
             
             try:
-                # Call DialogueManager
-                response = await self.dm.process_request(session_id, query, user_id, self.db)
+                # Call DialogueManager with real user_id
+                response = await self.dm.process_request(session_id, query, str(user_id), self.db)
                 
                 end_time = time.time()
                 total_ms = int((end_time - start_time) * 1000)
@@ -86,11 +85,8 @@ class EvalService:
                 
                 status = "PASS" if intent_match and keyword_match else "FAIL"
                 
-                # Extract provider info
-                # Assuming 'executor' is the main model used
                 models = metadata.get('models_used', {})
                 model_name = models.get('executor', 'unknown')
-                # Provider is not directly in metadata yet, infer or add to metadata later
                 provider = settings.DEFAULT_LLM_PROVIDER 
                 
                 return {

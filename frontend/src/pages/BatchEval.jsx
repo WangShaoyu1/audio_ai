@@ -1,11 +1,49 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileSpreadsheet, Play, Download, AlertCircle } from 'lucide-react';
+import { FileSpreadsheet, Play, Download, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { api } from '@/lib/api';
 
 const BatchEval = () => {
   const { t } = useTranslation();
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleFileChange = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+    }
+  };
+
+  const handleRunEval = async () => {
+    if (!file) return;
+    
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const blob = await api.download('/admin/eval/batch', formData);
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `eval_result_${new Date().toISOString().slice(0,10)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      alert('Evaluation completed and report downloaded.');
+    } catch (error) {
+      console.error('Eval failed:', error);
+      alert('Evaluation failed: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -21,9 +59,17 @@ const BatchEval = () => {
             <CardDescription>{t('eval.dragDrop')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer">
+            <div className="relative border-2 border-dashed border-border rounded-lg p-8 text-center hover:bg-muted/50 transition-colors">
+              <input 
+                type="file" 
+                accept=".xlsx"
+                onChange={handleFileChange}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
               <FileSpreadsheet className="h-10 w-10 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm font-medium">{t('eval.dragDrop')}</p>
+              <p className="text-sm font-medium">
+                {file ? file.name : t('eval.dragDrop')}
+              </p>
               <p className="text-xs text-muted-foreground mt-1">.xlsx files only</p>
             </div>
             
@@ -40,9 +86,17 @@ const BatchEval = () => {
               </ul>
             </div>
 
-            <Button className="w-full">
-              <Play className="mr-2 h-4 w-4" />
-              {t('common.status')}
+            <Button 
+              className="w-full" 
+              onClick={handleRunEval} 
+              disabled={!file || loading}
+            >
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="mr-2 h-4 w-4" />
+              )}
+              {loading ? 'Running Evaluation...' : 'Run Evaluation'}
             </Button>
           </CardContent>
         </Card>
@@ -50,22 +104,11 @@ const BatchEval = () => {
         <Card>
           <CardHeader>
             <CardTitle>{t('eval.history')}</CardTitle>
-            <CardDescription>{t('eval.history')}</CardDescription>
+            <CardDescription>Recent evaluation runs</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <div className="font-medium">Eval_Run_2024010{8-i}</div>
-                    <div className="text-xs text-muted-foreground">50 cases • 98% Pass Rate</div>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    <Download className="h-3 w-3 mr-2" />
-                    {t('common.download')}
-                  </Button>
-                </div>
-              ))}
+            <div className="text-center text-muted-foreground py-8">
+              History feature coming soon.
             </div>
           </CardContent>
         </Card>
