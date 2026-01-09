@@ -36,12 +36,40 @@ export default function Home() {
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [sessionToRename, setSessionToRename] = useState<Session | null>(null);
   const [newName, setNewName] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
 
   const [, setIsProcessing] = useState(false);
 
   useEffect(() => {
     fetchSessions();
   }, []);
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const timer = setTimeout(() => {
+        handleSearch(searchQuery);
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchQuery]);
+
+  const handleSearch = async (q: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/v1/search/messages?q=${encodeURIComponent(q)}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSearchResults(data);
+      }
+    } catch (error) {
+      console.error("Search failed", error);
+    }
+  };
 
   const fetchSessions = async () => {
     try {
@@ -70,6 +98,23 @@ export default function Home() {
   const selectSession = async (sessionId: string) => {
     setCurrentSessionId(sessionId);
     setMessages([]); 
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`/api/v1/sessions/${sessionId}/history`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const history = await res.json();
+        setMessages(history.map((msg: any) => ({
+          id: msg.timestamp, // Use timestamp as temporary ID
+          role: msg.role,
+          content: msg.content,
+          timestamp: new Date(msg.timestamp).getTime()
+        })));
+      }
+    } catch (error) {
+      console.error("Failed to load session history", error);
+    }
   };
 
   const renameSession = async () => {
@@ -176,7 +221,12 @@ export default function Home() {
       {/* Sidebar */}
       <aside className="w-64 border-r border-border bg-card/50 flex flex-col">
         <div className="p-4 border-b border-border">
-           <Input placeholder="搜索会话..." className="h-9" />
+           <Input 
+             placeholder="搜索会话..." 
+             className="h-9" 
+             value={searchQuery}
+             onChange={(e) => setSearchQuery(e.target.value)}
+           />
         </div>
         
         <div className="p-4">
@@ -187,39 +237,63 @@ export default function Home() {
         </div>
 
         <div className="flex-1 overflow-y-auto px-2 space-y-1">
-          {sessions.map(session => (
-            <div 
-              key={session.id}
-              className={cn(
-                "group flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-accent/50 transition-colors",
-                currentSessionId === session.id ? "bg-accent text-accent-foreground" : "text-muted-foreground"
-              )}
-              onClick={() => selectSession(session.id)}
-            >
-              <div className="flex items-center gap-2 overflow-hidden">
-                <MessageSquare className="w-4 h-4 flex-shrink-0" />
-                <span className="truncate text-sm">{session.name}</span>
+          {searchQuery ? (
+            searchResults.length > 0 ? (
+              searchResults.map((result, idx) => (
+                <div 
+                  key={idx}
+                  className="p-2 rounded-md cursor-pointer hover:bg-accent/50 transition-colors text-muted-foreground"
+                  onClick={() => selectSession(result.session_id)}
+                >
+                  <div className="flex items-center gap-2 overflow-hidden mb-1">
+                    <MessageSquare className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate text-xs font-medium">{result.session_name}</span>
+                  </div>
+                  <div className="text-xs truncate pl-5 opacity-80">
+                    {result.content}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-4 text-center text-sm text-muted-foreground">
+                无搜索结果
               </div>
-              
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground">
-                    <MoreVertical className="w-3 h-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSessionToRename(session); setNewName(session.name); setIsRenameDialogOpen(true); }}>
-                    <Edit2 className="w-3 h-3 mr-2" />
-                    重命名
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }} className="text-destructive">
-                    <Trash className="w-3 h-3 mr-2" />
-                    删除
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          ))}
+            )
+          ) : (
+            sessions.map(session => (
+              <div 
+                key={session.id}
+                className={cn(
+                  "group flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-accent/50 transition-colors",
+                  currentSessionId === session.id ? "bg-accent text-accent-foreground" : "text-muted-foreground"
+                )}
+                onClick={() => selectSession(session.id)}
+              >
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <MessageSquare className="w-4 h-4 flex-shrink-0" />
+                  <span className="truncate text-sm">{session.name}</span>
+                </div>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground">
+                      <MoreVertical className="w-3 h-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSessionToRename(session); setNewName(session.name); setIsRenameDialogOpen(true); }}>
+                      <Edit2 className="w-3 h-3 mr-2" />
+                      重命名
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); deleteSession(session.id); }} className="text-destructive">
+                      <Trash className="w-3 h-3 mr-2" />
+                      删除
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ))
+          )}
         </div>
       </aside>
 

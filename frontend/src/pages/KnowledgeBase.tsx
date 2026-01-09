@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Upload, FileText, Trash2, RefreshCw, Search, Settings } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 
 interface Document {
   id: string;
@@ -18,6 +19,7 @@ export default function KnowledgeBase() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   // Recall Test State
   const [query, setQuery] = useState("");
@@ -52,6 +54,16 @@ export default function KnowledgeBase() {
     if (!file) return;
 
     setUploading(true);
+    setUploadProgress(0);
+    
+    // Simulate progress since fetch doesn't support upload progress
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 90) return prev;
+        return prev + 10;
+      });
+    }, 200);
+
     const formData = new FormData();
     formData.append("file", file);
 
@@ -67,12 +79,18 @@ export default function KnowledgeBase() {
 
       if (!response.ok) throw new Error("Upload failed");
       
+      clearInterval(progressInterval);
+      setUploadProgress(100);
       toast.success("文档上传成功");
       fetchDocuments();
     } catch (error) {
+      clearInterval(progressInterval);
       toast.error("文档上传失败");
     } finally {
-      setUploading(false);
+      setTimeout(() => {
+        setUploading(false);
+        setUploadProgress(0);
+      }, 500);
       e.target.value = "";
     }
   };
@@ -143,6 +161,16 @@ export default function KnowledgeBase() {
               </Button>
             </div>
           </div>
+
+          {uploading && (
+            <div className="w-full space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>上传进度</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <Progress value={uploadProgress} className="h-2" />
+            </div>
+          )}
 
           <Card>
             <CardHeader>

@@ -1,8 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { MessageSquare, Database, FileText, Settings, LogOut, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/contexts/ThemeContext';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -11,6 +19,7 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [location] = useLocation();
   const { theme, toggleTheme: contextToggleTheme } = useTheme();
+  const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
 
   const navItems = [
     { path: '/', label: '聊天调试', icon: MessageSquare },
@@ -72,7 +81,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <Button 
             variant="ghost" 
             className="w-full justify-start gap-3 text-red-400 hover:text-red-500 hover:bg-red-500/10"
-            onClick={handleLogout}
+            onClick={() => setIsLogoutDialogOpen(true)}
           >
             <LogOut className="w-5 h-5" />
             <span>退出登录</span>
@@ -84,6 +93,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <div className="flex-1 flex flex-col overflow-hidden relative">
         {children}
       </div>
+
+      <Dialog open={isLogoutDialogOpen} onOpenChange={setIsLogoutDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>确认退出</DialogTitle>
+            <DialogDescription>
+              您确定要退出登录吗？
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsLogoutDialogOpen(false)}>取消</Button>
+            <Button variant="destructive" onClick={handleLogout}>退出</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
