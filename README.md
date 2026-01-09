@@ -1,26 +1,34 @@
 # AI Voice Solution (v2.1)
 
-Commercial-grade AI voice and semantic understanding system with Multi-Tenant Architecture, Advanced RAG, and Admin Dashboard.
+Product-level AI voice and semantic understanding system with Admin Dashboard, RAG, and Web Search.
 
 ## 🌟 New Features (v2.1)
 
-*   **Multi-Tenant Architecture**: Full data isolation based on User ID.
-*   **Advanced RAG Engine**: 
-    *   Configurable indexing modes (High Quality / Economy).
-    *   Hybrid retrieval (Vector + Full-Text).
-    *   Rerank support with adjustable Top-K and Score Threshold.
-*   **Instruction Management**: 
-    *   CRUD operations for Function Calling definitions.
-    *   Excel import support.
-    *   Mutex logic validation.
-*   **Batch Evaluation**: 
-    *   Upload Excel test cases.
-    *   Automated intent and keyword matching.
-    *   Downloadable evaluation reports.
-*   **Chat Debugger**: 
-    *   Multi-session management.
-    *   Real-time latency and routing metadata.
-    *   Trace ID tracking.
+*   **多租户架构 (Multi-Tenant Architecture)**: 基于 User ID 的全链路数据隔离，支持多用户独立使用。
+*   **高级 RAG 引擎 (Advanced RAG Engine)**: 
+    *   **索引模式**: 支持“高质量”（深度语义）与“经济”（关键词）两种模式。
+    *   **混合检索**: 结合向量检索与全文检索，提升召回准确率。
+    *   **重排序 (Rerank)**: 集成 Rerank 模型，支持自定义 Top-K 和相关度阈值。
+*   **指令管理 (Instruction Management)**: 
+    *   支持 Function Calling 定义的增删改查。
+    *   支持 Excel 批量导入指令集。
+    *   内置互斥逻辑校验。
+*   **批量评测 (Batch Evaluation)**: 
+    *   支持上传 Excel 测试用例。
+    *   自动进行意图识别与关键词匹配测试。
+    *   生成并下载详细的评测报告。
+*   **聊天调试台 (Chat Debugger)**: 
+    *   支持多会话管理（新建/切换/删除）。
+    *   实时展示路由决策、耗时 (Latency) 和搜索源元数据。
+    *   全链路 Trace ID 追踪。
+
+## 🌟 New Features (v2.0)
+
+*   **Admin Dashboard**: A Manus-style web interface for chat debugging, knowledge management, and batch evaluation.
+*   **Traceability**: Full visibility into model routing, latency (TTFT), and search sources per message.
+*   **Web Search**: Real-time internet access via DuckDuckGo (default), Tavily, or Serper.
+*   **Batch Evaluation**: Automated testing via Excel upload with Pass/Fail metrics.
+*   **Instruction Management**: Bulk import of instructions via Excel.
 
 ## 📚 最佳实践 (Best Practices)
 
