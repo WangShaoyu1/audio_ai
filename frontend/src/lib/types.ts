@@ -11,8 +11,10 @@ export interface Message {
     arguments: Record<string, any>;
   };
   latency?: number;
+  ttft?: number;
   confidence?: number;
   metadata?: any;
+  isError?: boolean;
 }
 
 export interface SystemState {

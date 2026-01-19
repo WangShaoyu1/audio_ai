@@ -39,15 +39,15 @@ class MemoryManager:
             logger.error(f"Long-term Memory Error: {e}")
             return {}
 
-    async def save_message(self, session_id: str, role: str, content: str, user_id: str):
+    async def save_message(self, session_id: str, role: str, content: str, user_id: str, metadata: Optional[Dict] = None) -> str:
         """保存消息到 Redis (短期) 和 DB (中期)"""
         if not settings.MEMORY_ENABLE:
-            return
+            return ""
 
         try:
             # 1. Save to Redis (Short-term)
             key = f"session:{session_id}:history"
-            message_data = {"role": role, "content": content}
+            message_data = {"role": role, "content": content, "metadata": metadata}
             async with self.redis.pipeline() as pipe:
                 await pipe.lpush(key, json.dumps(message_data))
                 await pipe.ltrim(key, 0, 9) # Keep last 10 messages
@@ -55,16 +55,18 @@ class MemoryManager:
                 await pipe.execute()
 
             # 2. Save to DB (Mid-term)
-            # Check if session exists, create if not
-            # (Simplified logic, in prod should be handled by SessionService)
             db_msg = Message(
                 session_id=session_id,
                 role=role,
-                content=content
+                content=content,
+                metadata_=metadata or {}
             )
             self.db.add(db_msg)
             await self.db.commit()
             
+            return str(db_msg.id)
+            
         except Exception as e:
             logger.error(f"Save Memory Error: {e}")
             await self.db.rollback()
+            return ""

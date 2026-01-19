@@ -20,7 +20,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(BaseHTTPMiddleware, dispatch=log_requests)
+# app.add_middleware(BaseHTTPMiddleware, dispatch=log_requests)
 
 app.include_router(auth_router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(api_router, prefix=settings.API_V1_STR, tags=["chat"])

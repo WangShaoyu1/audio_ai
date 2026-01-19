@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Upload, FileText, Trash2, RefreshCw, Search, Settings } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 interface Document {
   id: string;
@@ -16,6 +18,7 @@ interface Document {
 }
 
 export default function KnowledgeBase() {
+  const { t } = useTranslation();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -39,7 +42,7 @@ export default function KnowledgeBase() {
       const data = await response.json();
       setDocuments(data);
     } catch (error) {
-      toast.error("加载文档失败");
+      toast.error(t("kb.loadError"));
     } finally {
       setLoading(false);
     }
@@ -113,7 +116,7 @@ export default function KnowledgeBase() {
       const data = await response.json();
       setTestResults(data.results);
     } catch (error) {
-      toast.error("召回测试失败");
+      toast.error(t("kb.testError"));
     } finally {
       setTesting(false);
     }
@@ -122,22 +125,23 @@ export default function KnowledgeBase() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">知识库管理</h1>
+        <h1 className="text-3xl font-bold">{t("kb.title")}</h1>
+        <LanguageToggle />
       </div>
 
       <Tabs defaultValue="documents" className="space-y-4">
         <TabsList>
           <TabsTrigger value="documents">
             <FileText className="w-4 h-4 mr-2" />
-            文档列表
+            {t("kb.tabDocs")}
           </TabsTrigger>
           <TabsTrigger value="settings">
             <Settings className="w-4 h-4 mr-2" />
-            RAG设置
+            {t("kb.tabSettings")}
           </TabsTrigger>
           <TabsTrigger value="test">
             <Search className="w-4 h-4 mr-2" />
-            召回测试
+            {t("kb.tabTest")}
           </TabsTrigger>
         </TabsList>
 
@@ -145,7 +149,7 @@ export default function KnowledgeBase() {
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={fetchDocuments} disabled={loading}>
               <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-              刷新
+              {t("kb.refresh")}
             </Button>
             <div className="relative">
               <Input
@@ -157,7 +161,7 @@ export default function KnowledgeBase() {
               />
               <Button disabled={uploading}>
                 <Upload className="w-4 h-4 mr-2" />
-                {uploading ? "上传中..." : "上传文档"}
+                {uploading ? t("kb.uploading") : t("kb.upload")}
               </Button>
             </div>
           </div>
@@ -165,7 +169,7 @@ export default function KnowledgeBase() {
           {uploading && (
             <div className="w-full space-y-1">
               <div className="flex justify-between text-xs text-muted-foreground">
-                <span>上传进度</span>
+                <span>{t("kb.uploadProgress")}</span>
                 <span>{uploadProgress}%</span>
               </div>
               <Progress value={uploadProgress} className="h-2" />
@@ -174,23 +178,23 @@ export default function KnowledgeBase() {
 
           <Card>
             <CardHeader>
-              <CardTitle>文档列表</CardTitle>
+              <CardTitle>{t("kb.tabDocs")}</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>文件名</TableHead>
-                    <TableHead>状态</TableHead>
-                    <TableHead>上传日期</TableHead>
-                    <TableHead className="text-right">操作</TableHead>
+                    <TableHead>{t("kb.colFilename")}</TableHead>
+                    <TableHead>{t("kb.colStatus")}</TableHead>
+                    <TableHead>{t("kb.colDate")}</TableHead>
+                    <TableHead className="text-right">{t("kb.colActions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {documents.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                        暂无文档，请上传。
+                        {t("kb.noDocs")}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -206,8 +210,8 @@ export default function KnowledgeBase() {
                             doc.status === 'processing' ? 'bg-yellow-500/20 text-yellow-400' : 
                             'bg-red-500/20 text-red-400'
                           }`}>
-                            {doc.status === 'indexed' ? '已索引' : 
-                             doc.status === 'processing' ? '处理中' : '失败'}
+                            {doc.status === 'indexed' ? t("kb.statusIndexed") : 
+                             doc.status === 'processing' ? t("kb.statusProcessing") : t("kb.statusFailed")}
                           </span>
                         </TableCell>
                         <TableCell>{new Date(doc.created_at).toLocaleDateString()}</TableCell>
@@ -228,12 +232,12 @@ export default function KnowledgeBase() {
         <TabsContent value="settings">
           <Card>
             <CardHeader>
-              <CardTitle>RAG 配置</CardTitle>
-              <CardDescription>配置检索参数和索引设置。</CardDescription>
+              <CardTitle>{t("kb.ragConfigTitle")}</CardTitle>
+              <CardDescription>{t("kb.ragConfigDesc")}</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="text-muted-foreground text-sm">
-                设置功能开发中...
+                {t("kb.settingsDev")}
               </div>
             </CardContent>
           </Card>
@@ -242,26 +246,26 @@ export default function KnowledgeBase() {
         <TabsContent value="test" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>召回测试</CardTitle>
-              <CardDescription>输入查询语句测试检索系统的召回效果。</CardDescription>
+              <CardTitle>{t("kb.tabTest")}</CardTitle>
+              <CardDescription>{t("kb.testDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-2">
                 <Input 
-                  placeholder="输入查询语句..." 
+                  placeholder={t("kb.testPlaceholder")} 
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleRecallTest()}
                 />
                 <Button onClick={handleRecallTest} disabled={testing}>
                   {testing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                  测试
+                  {t("kb.testBtn")}
                 </Button>
               </div>
 
               {testResults.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="font-medium">检索结果:</h3>
+                  <h3 className="font-medium">{t("kb.testResults")}</h3>
                   {testResults.map((result, i) => (
                     <div key={i} className="p-3 rounded-lg bg-muted/50 text-sm">
                       {result}

@@ -1,0 +1,51 @@
+{
+  "_comment": "提示词配置文件。支持 {variable} 格式的占位符。",
+  
+  "settings": {
+    "provider_language_defaults": {
+      "qwen": "zh",
+      "zhipu": "zh",
+      "minimax": "zh",
+      "qianfan": "zh",
+      "spark": "zh",
+      "deepseek": "zh",
+      "openai": "en",
+      "azure": "en",
+      "google": "en"
+    }
+  },
+
+  "templates": {
+    "search": {
+      "en": "You are a helpful AI assistant backed by a real-time search engine.\nYour goal is to answer the user's question using ONLY the provided Search Results.\n\nGuidelines:\n1. Prioritize the most recent and relevant information from the Search Results.\n2. Do NOT use your internal training data if it conflicts with the search results.\n3. Do NOT make up information or roleplay (e.g., do not pretend to use magic).\n4. Always cite your sources using the format [[Title]](Link) at the end of the statement or paragraph.\n5. If the search results do not contain the answer, admit that you cannot find the information.\n\nSearch Results:\n{context_str}",
+      "zh": "你是一个由实时搜索引擎支持的AI助手。\n你的目标是**仅使用**提供的搜索结果来回答用户的问题。\n\n指南：\n1. 优先使用搜索结果中最新和最相关的信息。\n2. 如果内部训练数据与搜索结果冲突，**不要**使用内部数据。\n3. **不要**编造信息或进行角色扮演（例如，不要假装使用魔法）。\n4. 始终在语句或段落末尾使用 [[标题]](链接) 格式引用来源。\n5. 如果搜索结果中没有答案，请承认你无法找到该信息。\n\n搜索结果：\n{context_str}"
+    },
+    "chat": {
+      "en": "You are a helpful AI assistant.",
+      "zh": "你是一个乐于助人的AI助手。"
+    },
+    "rag": {
+      "en": "You are a helpful assistant. Answer based on the provided context.\nContext:\n{context_str}",
+      "zh": "你是一个乐于助人的助手。请基于提供的上下文进行回答。\n上下文：\n{context_str}"
+    },
+    "instruction": {
+        "en": "Classify the user's intent into one of: ['instruction', 'rag', 'search', 'chat'].\n\nDefinitions:\n- instruction: Control device (microwave), set time/mode, stop/start.\n- rag: Ask about recipes, user manual, or specific knowledge in documents.\n- search: Ask about real-time info (weather, news, stock prices) or facts requiring internet search.\n- chat: General conversation, greetings, or questions about general knowledge.\n\nUser Query: {query}\n\nReturn ONLY the intent label.",
+        "zh": "将用户的意图分类为以下之一：['instruction', 'rag', 'search', 'chat']。\n\n定义：\n- instruction: 控制设备（微波炉），设置时间/模式，停止/开始。\n- rag: 询问食谱、用户手册或文档中的特定知识。\n- search: 询问实时信息（天气、新闻、股价）或需要联网搜索的事实。\n- chat: 一般对话、问候或关于一般知识的问题。\n\n用户查询：{query}\n\n仅返回意图标签。"
+    },
+    "check_search": {
+        "en": "Does the following user query require real-time information from the internet (e.g. weather, news, stock prices, current events)?\nQuery: {query}\nReturn 'YES' or 'NO'.",
+        "zh": "以下用户查询是否需要来自互联网的实时信息（例如天气、新闻、股票价格、时事）？\n查询：{query}\n返回 'YES' 或 'NO'。"
+    }
+  },
+
+  "overrides": [
+    {
+      "provider": "qwen",
+      "model": "qwen-flash",
+      "intent": "search",
+      "templates": {
+        "zh": "你是一个由实时搜索引擎支持的AI助手。\n你的目标是**仅使用**提供的搜索结果来回答用户的问题。\n\n特别注意：\n- **绝对禁止**编造事实或使用魔法、占卜等虚构设定。\n- 必须基于搜索结果中的事实进行回答。\n\n搜索结果：\n{context_str}"
+      }
+    }
+  ]
+}

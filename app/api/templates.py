@@ -1,9 +1,10 @@
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
+from app.core.route_logging import LoggingContextRoute
 import io
 import pandas as pd
 
-router = APIRouter()
+router = APIRouter(route_class=LoggingContextRoute)
 
 @router.get("/templates/batch-eval")
 async def get_batch_eval_template():

@@ -11,10 +11,11 @@ from app.models.base import Document, User
 from app.api.deps import get_current_user
 from typing import List, Dict, Any
 from pydantic import BaseModel
+from app.core.route_logging import LoggingContextRoute
 import uuid
 import io
 
-router = APIRouter()
+router = APIRouter(route_class=LoggingContextRoute)
 
 @router.post("/admin/instructions")
 async def create_instruction(

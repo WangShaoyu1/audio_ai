@@ -5,10 +5,11 @@ from sqlalchemy import update, delete
 from app.db.session import get_db
 from app.api.deps import get_current_user
 from app.models.base import User, Session as ChatSession
+from app.core.route_logging import LoggingContextRoute
 from pydantic import BaseModel
 from typing import List
 
-router = APIRouter()
+router = APIRouter(route_class=LoggingContextRoute)
 
 class SessionRenameRequest(BaseModel):
     name: str
@@ -63,6 +64,8 @@ async def delete_session(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    from app.models.base import Message
+
     # Verify ownership
     result = await db.execute(
         select(ChatSession).filter(ChatSession.id == session_id, ChatSession.user_id == current_user.id)
@@ -71,6 +74,11 @@ async def delete_session(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
+    # Delete messages first (to handle FK constraints if cascade is not set)
+    await db.execute(
+        delete(Message).where(Message.session_id == session_id)
+    )
+    
     await db.delete(session)
     await db.commit()
     return {"status": "success"}
@@ -78,10 +86,12 @@ async def delete_session(
 @router.get("/sessions/{session_id}/history")
 async def get_session_history(
     session_id: str,
+    limit: int = 20,
+    offset: int = 0,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    from app.models.base import ChatMessage
+    from app.models.base import Message
     
     # Verify ownership
     result = await db.execute(
@@ -93,19 +103,24 @@ async def get_session_history(
     
     # Fetch messages
     result = await db.execute(
-        select(ChatMessage)
-        .filter(ChatMessage.session_id == session_id)
-        .order_by(ChatMessage.timestamp.asc())
+        select(Message)
+        .filter(Message.session_id == session_id)
+        .order_by(Message.created_at.desc())
+        .offset(offset)
+        .limit(limit)
     )
     messages = result.scalars().all()
     
+    # Return in chronological order (reversed from desc fetch)
     return [
         {
+            "id": str(msg.id),
             "role": msg.role,
             "content": msg.content,
-            "timestamp": msg.timestamp.isoformat()
+            "timestamp": msg.created_at.isoformat(),
+            "metadata": msg.metadata_
         }
-        for msg in messages
+        for msg in reversed(messages)
     ]
 
 @router.get("/search/messages")
@@ -114,7 +129,7 @@ async def search_messages(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    from app.models.base import ChatMessage
+    from app.models.base import Message
     from sqlalchemy import or_
     
     if not q:
@@ -131,13 +146,13 @@ async def search_messages(
         
     # Search messages in these sessions
     messages_query = (
-        select(ChatMessage, ChatSession.name.label("session_name"))
-        .join(ChatSession, ChatMessage.session_id == ChatSession.id)
+        select(Message, ChatSession.name.label("session_name"))
+        .join(ChatSession, Message.session_id == ChatSession.id)
         .filter(
-            ChatMessage.session_id.in_(user_session_ids),
-            ChatMessage.content.ilike(f"%{q}%")
+            Message.session_id.in_(user_session_ids),
+            Message.content.ilike(f"%{q}%")
         )
-        .order_by(ChatMessage.timestamp.desc())
+        .order_by(Message.created_at.desc())
         .limit(20)
     )
     
@@ -146,12 +161,12 @@ async def search_messages(
     
     return [
         {
-            "session_id": str(msg.ChatMessage.session_id),
+            "session_id": str(msg.Message.session_id),
             "session_name": msg.session_name or "New Chat",
-            "message_id": str(msg.ChatMessage.id),
-            "content": msg.ChatMessage.content,
-            "role": msg.ChatMessage.role,
-            "timestamp": msg.ChatMessage.timestamp.isoformat()
+            "message_id": str(msg.Message.id),
+            "content": msg.Message.content,
+            "role": msg.Message.role,
+            "timestamp": msg.Message.created_at.isoformat()
         }
         for msg in matches
     ]

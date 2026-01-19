@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Plus, Terminal, Trash2, RefreshCw, Download } from "lucide-react";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 interface Instruction {
   id: string;
@@ -18,6 +20,7 @@ interface Instruction {
 }
 
 export default function Instructions() {
+  const { t } = useTranslation();
   const [instructions, setInstructions] = useState<Instruction[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -40,7 +43,7 @@ export default function Instructions() {
       const data = await response.json();
       setInstructions(data);
     } catch (error) {
-      toast.error("加载指令失败");
+      toast.error(t("instructions.loadError"));
     } finally {
       setLoading(false);
     }
@@ -57,7 +60,7 @@ export default function Instructions() {
       try {
         parsedParams = JSON.parse(newInstruction.parameters);
       } catch (e) {
-        toast.error("JSON 参数格式错误");
+        toast.error(t("instructions.jsonError"));
         return;
       }
 
@@ -76,60 +79,61 @@ export default function Instructions() {
 
       if (!response.ok) throw new Error("Failed to create instruction");
       
-      toast.success("指令创建成功");
+      toast.success(t("instructions.createSuccess"));
       setOpen(false);
       setNewInstruction({ name: "", description: "", parameters: "{}" });
       fetchInstructions();
     } catch (error) {
-      toast.error("创建指令失败");
+      toast.error(t("instructions.createError"));
     }
   };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">指令管理</h1>
-        <div className="flex gap-2">
+        <h1 className="text-3xl font-bold">{t("instructions.title")}</h1>
+        <div className="flex gap-2 items-center">
+          <LanguageToggle />
           <Button variant="outline" onClick={() => window.open("/api/v1/templates/instructions", "_blank")}>
             <Download className="w-4 h-4 mr-2" />
-            下载模板
+            {t("batchEval.downloadTemplate")}
           </Button>
           <Button variant="outline" onClick={fetchInstructions} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-            刷新
+            {t("kb.refresh")}
           </Button>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="w-4 h-4 mr-2" />
-                新建指令
+                {t("instructions.createBtn")}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>创建新指令</DialogTitle>
+                <DialogTitle>{t("instructions.createDialogTitle")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name">名称</Label>
+                  <Label htmlFor="name">{t("instructions.labelName")}</Label>
                   <Input
                     id="name"
                     value={newInstruction.name}
                     onChange={(e) => setNewInstruction({ ...newInstruction, name: e.target.value })}
-                    placeholder="例如: start_cooking"
+                    placeholder={t("instructions.placeholderName")}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="description">描述</Label>
+                  <Label htmlFor="description">{t("instructions.labelDesc")}</Label>
                   <Textarea
                     id="description"
                     value={newInstruction.description}
                     onChange={(e) => setNewInstruction({ ...newInstruction, description: e.target.value })}
-                    placeholder="该指令的功能描述"
+                    placeholder={t("instructions.placeholderDesc")}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="parameters">参数 (JSON)</Label>
+                  <Label htmlFor="parameters">{t("instructions.labelParams")}</Label>
                   <Textarea
                     id="parameters"
                     value={newInstruction.parameters}
@@ -140,7 +144,7 @@ export default function Instructions() {
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={handleCreate}>创建</Button>
+                <Button onClick={handleCreate}>{t("instructions.btnCreate")}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -149,23 +153,23 @@ export default function Instructions() {
 
       <Card>
         <CardHeader>
-          <CardTitle>已定义指令</CardTitle>
+          <CardTitle>{t("instructions.listTitle")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>名称</TableHead>
-                <TableHead>描述</TableHead>
-                <TableHead>参数</TableHead>
-                <TableHead className="text-right">操作</TableHead>
+                <TableHead>{t("instructions.colName")}</TableHead>
+                <TableHead>{t("instructions.colDesc")}</TableHead>
+                <TableHead>{t("instructions.colParams")}</TableHead>
+                <TableHead className="text-right">{t("instructions.colActions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {instructions.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                    暂无指令，请创建。
+                    {t("instructions.noData")}
                   </TableCell>
                 </TableRow>
               ) : (

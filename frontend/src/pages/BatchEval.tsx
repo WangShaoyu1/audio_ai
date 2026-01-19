@@ -1,11 +1,14 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Upload, FileSpreadsheet, Download } from "lucide-react";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 export default function BatchEval() {
+  const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -26,7 +29,7 @@ export default function BatchEval() {
         body: formData
       });
 
-      if (!response.ok) throw new Error("Evaluation failed");
+      if (!response.ok) throw new Error(t("batchEval.evalFailed"));
       
       // Download the result file
       const blob = await response.blob();
@@ -39,9 +42,9 @@ export default function BatchEval() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      toast.success("批量评测完成，结果已下载");
+      toast.success(t("batchEval.success"));
     } catch (error) {
-      toast.error("批量评测失败");
+      toast.error(t("batchEval.error"));
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -50,13 +53,16 @@ export default function BatchEval() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <h1 className="text-3xl font-bold">批量评测</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">{t("batchEval.title")}</h1>
+        <LanguageToggle />
+      </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>运行批量评测</CardTitle>
+          <CardTitle>{t("batchEval.runTitle")}</CardTitle>
           <CardDescription>
-            上传包含测试用例的 Excel 文件。系统将处理每个用例并生成报告。
+            {t("batchEval.runDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -67,13 +73,13 @@ export default function BatchEval() {
               </div>
             </div>
             <div>
-              <h3 className="text-lg font-medium">上传测试用例</h3>
+              <h3 className="text-lg font-medium">{t("batchEval.uploadTitle")}</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                支持格式: .xlsx
+                {t("batchEval.uploadFormat")}
               </p>
               <Button variant="link" className="text-sm h-auto p-0 mt-2" onClick={() => window.open("/api/v1/templates/batch-eval", "_blank")}>
                 <Download className="w-3 h-3 mr-1" />
-                下载模板
+                {t("batchEval.downloadTemplate")}
               </Button>
             </div>
             <div className="flex justify-center">
@@ -87,21 +93,21 @@ export default function BatchEval() {
                 />
                 <Button disabled={uploading}>
                   <Upload className="w-4 h-4 mr-2" />
-                  {uploading ? "处理中..." : "选择文件"}
+                  {uploading ? t("batchEval.processing") : t("batchEval.selectFile")}
                 </Button>
               </div>
             </div>
           </div>
 
           <div className="bg-muted p-4 rounded-lg">
-            <h4 className="font-medium mb-2">模板格式说明</h4>
+            <h4 className="font-medium mb-2">{t("batchEval.templateFormat")}</h4>
             <p className="text-sm text-muted-foreground mb-2">
-              Excel 文件应包含以下列：
+              {t("batchEval.templateDesc")}
             </p>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-              <li><strong>query</strong>: 用户输入的文本</li>
-              <li><strong>expected_intent</strong>: (可选) 预期的意图名称</li>
-              <li><strong>expected_slots</strong>: (可选) 预期槽位的 JSON 字符串</li>
+              <li><strong>query</strong>: {t("batchEval.colQuery")}</li>
+              <li><strong>expected_intent</strong>: {t("batchEval.colIntent")}</li>
+              <li><strong>expected_slots</strong>: {t("batchEval.colSlots")}</li>
             </ul>
           </div>
         </CardContent>

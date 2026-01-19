@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'wouter';
+import { useTranslation } from "react-i18next";
 import { MessageSquare, Database, FileText, Settings, LogOut, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -17,15 +18,16 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
+  const { t } = useTranslation();
   const [location] = useLocation();
   const { theme, toggleTheme: contextToggleTheme } = useTheme();
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
 
   const navItems = [
-    { path: '/', label: '聊天调试', icon: MessageSquare },
-    { path: '/knowledge-base', label: '知识库', icon: Database },
-    { path: '/batch-eval', label: '批量评测', icon: FileText },
-    { path: '/instructions', label: '指令配置', icon: Settings },
+    { path: '/', label: t('nav.chatDebugger'), icon: MessageSquare },
+    { path: '/knowledge-base', label: t('nav.knowledgeBase'), icon: Database },
+    { path: '/batch-eval', label: t('nav.batchEval'), icon: FileText },
+    { path: '/instructions', label: t('nav.instructions'), icon: Settings },
   ];
 
   const handleLogout = () => {
@@ -54,15 +56,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             const Icon = item.icon;
             const isActive = location === item.path;
             return (
-              <Link key={item.path} href={item.path}>
-                <a className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              <Link 
+                key={item.path} 
+                href={item.path}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                   isActive 
                     ? 'bg-primary text-primary-foreground' 
                     : 'hover:bg-accent hover:text-accent-foreground text-muted-foreground'
-                }`}>
-                  <Icon className="w-5 h-5" />
-                  <span className="font-medium">{item.label}</span>
-                </a>
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="font-medium">{item.label}</span>
               </Link>
             );
           })}
@@ -75,7 +79,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             onClick={toggleTheme}
           >
             {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            <span>{theme === 'dark' ? '亮色模式' : '暗色模式'}</span>
+            <span>{theme === 'dark' ? t('layout.lightMode') : t('layout.darkMode')}</span>
           </Button>
           
           <Button 
@@ -84,7 +88,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             onClick={() => setIsLogoutDialogOpen(true)}
           >
             <LogOut className="w-5 h-5" />
-            <span>退出登录</span>
+            <span>{t('layout.logout')}</span>
           </Button>
         </div>
       </div>
@@ -97,14 +101,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <Dialog open={isLogoutDialogOpen} onOpenChange={setIsLogoutDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>确认退出</DialogTitle>
+            <DialogTitle>{t('layout.logoutTitle')}</DialogTitle>
             <DialogDescription>
-              您确定要退出登录吗？
+              {t('layout.logoutDesc')}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsLogoutDialogOpen(false)}>取消</Button>
-            <Button variant="destructive" onClick={handleLogout}>退出</Button>
+            <Button variant="outline" onClick={() => setIsLogoutDialogOpen(false)}>{t('layout.cancel')}</Button>
+            <Button variant="destructive" onClick={handleLogout}>{t('layout.confirm')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -3,7 +3,7 @@ import json
 import time
 import os
 
-BASE_URL = "http://localhost:8000/api/v1"
+BASE_URL = "http://localhost:8001/api/v1"
 TEST_USER = "test_user_001"
 TEST_PASSWORD = "password123"
 

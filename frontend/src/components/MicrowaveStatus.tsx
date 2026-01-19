@@ -1,12 +1,14 @@
 import { SystemState } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Clock, Flame, Thermometer, Timer } from 'lucide-react';
+import { useTranslation } from "react-i18next";
 
 interface MicrowaveStatusProps {
   state: SystemState['microwaveState'];
 }
 
 export default function MicrowaveStatus({ state }: MicrowaveStatusProps) {
+  const { t } = useTranslation();
   return (
     <div className="glass-card relative overflow-hidden group">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -18,14 +20,14 @@ export default function MicrowaveStatus({ state }: MicrowaveStatusProps) {
             state.status === 'cooking' ? "bg-green-400 animate-pulse" : 
             state.status === 'paused' ? "bg-yellow-400" : "bg-slate-400"
           )} />
-          Device Status
+          {t("device.status")}
         </h3>
         
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-white/5 rounded-xl p-3 border border-white/5">
             <div className="flex items-center gap-2 text-sm text-white/60 mb-1">
               <Flame className="w-4 h-4" />
-              Firepower
+              {t("device.firepower")}
             </div>
             <div className="text-xl font-mono font-medium text-white">
               {state.firepower ? state.firepower.toUpperCase() : '--'}
@@ -35,7 +37,7 @@ export default function MicrowaveStatus({ state }: MicrowaveStatusProps) {
           <div className="bg-white/5 rounded-xl p-3 border border-white/5">
             <div className="flex items-center gap-2 text-sm text-white/60 mb-1">
               <Thermometer className="w-4 h-4" />
-              Temp
+              {t("device.temp")}
             </div>
             <div className="text-xl font-mono font-medium text-white">
               {state.temperature ? `${state.temperature}°C` : '--'}
@@ -46,7 +48,7 @@ export default function MicrowaveStatus({ state }: MicrowaveStatusProps) {
             <div>
               <div className="flex items-center gap-2 text-sm text-white/60 mb-1">
                 <Timer className="w-4 h-4" />
-                Remaining Time
+                {t("device.remaining")}
               </div>
               <div className="text-3xl font-mono font-bold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">
                 {state.remaining ? formatTime(state.remaining) : '00:00'}

@@ -5,10 +5,11 @@ from pydantic import BaseModel
 from app.db.session import get_db
 from app.models.base import User
 from app.core.security import create_access_token
+from app.core.route_logging import LoggingContextRoute
 from datetime import datetime
 import uuid
 
-router = APIRouter()
+router = APIRouter(route_class=LoggingContextRoute)
 
 class LoginRequest(BaseModel):
     phone: str

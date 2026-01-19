@@ -50,10 +50,32 @@ class SearchService:
             logger.error("Tavily API Key is missing")
             return []
         
-        # Placeholder for Tavily implementation
-        # In a real implementation, we would use httpx to call https://api.tavily.com/search
-        logger.warning("Tavily search not fully implemented yet")
-        return []
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://api.tavily.com/search",
+                    json={
+                        "api_key": settings.TAVILY_API_KEY,
+                        "query": query,
+                        "search_depth": "basic",
+                        "max_results": max_results
+                    },
+                    timeout=10.0
+                )
+                response.raise_for_status()
+                data = response.json()
+                results = []
+                for result in data.get("results", []):
+                    results.append({
+                        "title": result.get("title", ""),
+                        "href": result.get("url", ""),
+                        "body": result.get("content", "")
+                    })
+                return results
+        except Exception as e:
+            logger.error(f"Tavily search failed: {e}")
+            return []
 
     async def _search_serper(self, query: str, max_results: int) -> List[Dict[str, str]]:
         if not settings.SERPER_API_KEY:
