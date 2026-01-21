@@ -14,12 +14,15 @@ class InstructionImportService:
         self.db = db
         self.instruction_service = InstructionService(db)
 
-    async def import_from_excel(self, file_content: bytes, user_id: uuid.UUID) -> Dict[str, Any]:
+    async def import_from_excel(self, file_content: bytes, user_id: uuid.UUID, filename: str = "import.xlsx") -> Dict[str, Any]:
         """
-        Import instructions from Excel file.
+        Import instructions from Excel or CSV file.
         """
         try:
-            df = pd.read_excel(io.BytesIO(file_content))
+            if filename.lower().endswith('.csv'):
+                df = pd.read_csv(io.BytesIO(file_content))
+            else:
+                df = pd.read_excel(io.BytesIO(file_content))
             
             required_cols = ['name', 'description', 'parameters_json']
             if not all(col in df.columns for col in required_cols):

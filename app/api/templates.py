@@ -25,13 +25,28 @@ async def get_batch_eval_template():
         headers={"Content-Disposition": "attachment; filename=batch_eval_template.xlsx"}
     )
 
+import json
+from app.core.default_instructions import DEFAULT_INSTRUCTIONS
+
 @router.get("/templates/instructions")
 async def get_instructions_template():
+    # Prepare data from DEFAULT_INSTRUCTIONS
+    names = []
+    descriptions = []
+    parameters = []
+    mutex_configs = []
+
+    for instr in DEFAULT_INSTRUCTIONS:
+        names.append(instr["name"])
+        descriptions.append(instr["description"])
+        parameters.append(json.dumps(instr["parameters"], ensure_ascii=False))
+        mutex_configs.append(json.dumps(instr.get("mutex_config", {"incompatible": []}), ensure_ascii=False))
+
     df = pd.DataFrame({
-        'name': ['instruction_name'],
-        'description': ['Description of the instruction'],
-        'parameters': ['{"param1": "string"}'],
-        'mutex_config': ['{"incompatible": []}']
+        'name': names,
+        'description': descriptions,
+        'parameters_json': parameters,
+        'mutex_config_json': mutex_configs
     })
     
     output = io.BytesIO()

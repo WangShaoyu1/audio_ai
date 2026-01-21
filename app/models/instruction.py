@@ -6,7 +6,7 @@ class Instruction(Base):
     __tablename__ = "instructions"
     
     id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID_TYPE, ForeignKey("users.id"), nullable=False) # Added user_id
+    user_id = Column(UUID_TYPE, ForeignKey("users.id"), nullable=True) # Nullable for system defaults
     name = Column(String, nullable=False, index=True) # Removed unique constraint globally, should be unique per user
     description = Column(Text, nullable=False)
     parameters = Column(JSON_TYPE, nullable=False, default={}) # JSON Schema

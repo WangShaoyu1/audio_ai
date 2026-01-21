@@ -46,6 +46,7 @@ langchain==1.2.0
 langchain-classic==1.0.1
 langchain-community==0.4.1
 langchain-core==1.2.6
+langchain-ollama
 langchain-google-genai==4.1.3
 langchain-openai==1.1.6
 langchain-text-splitters==1.1.0
@@ -75,6 +76,7 @@ pyasn1==0.6.1
 pyasn1_modules==0.4.2
 pycparser==2.23
 pydantic==2.12.5
+pypdf
 pydantic-settings==2.12.0
 pydantic_core==2.41.5
 pytest==7.4.4

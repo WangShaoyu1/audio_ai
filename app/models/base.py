@@ -46,12 +46,26 @@ class Document(Base):
     size = Column(String, nullable=True)
     status = Column(String, default="uploaded")
     error_msg = Column(Text, nullable=True)
+    content = Column(Text, nullable=True) # Store raw content for delayed indexing
+    file_path = Column(String, nullable=True) # Path to stored original file
+    provider = Column(String, nullable=True) # Embedding provider used
+    model = Column(String, nullable=True) # Embedding model used
+    is_configured = Column(Boolean, default=False) # Whether RAG config has been confirmed for this doc
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class DocumentChunk(Base):
     __tablename__ = "document_chunks"
     id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
-    doc_id = Column(UUID_TYPE, ForeignKey("documents.id"), nullable=False)
+    doc_id = Column(UUID_TYPE, ForeignKey("documents.id", ondelete="CASCADE"), nullable=False)
     content = Column(Text, nullable=False)
     chunk_index = Column(Integer, nullable=False)
     embedding = Column(VECTOR_TYPE)
+
+class RAGTestRecord(Base):
+    __tablename__ = "rag_test_records"
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID_TYPE, ForeignKey("users.id"), nullable=False)
+    doc_id = Column(UUID_TYPE, ForeignKey("documents.id", ondelete="CASCADE"), nullable=True)
+    query = Column(Text, nullable=False)
+    results = Column(JSON_TYPE, default=[]) # Store list of retrieved chunks
+    created_at = Column(DateTime, default=datetime.utcnow)

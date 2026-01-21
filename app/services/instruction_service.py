@@ -16,6 +16,36 @@ class InstructionService:
         )
         return result.scalars().all()
 
+    async def get_instructions_paginated(self, user_id: uuid.UUID, page: int, page_size: int) -> Dict[str, Any]:
+        from sqlalchemy import func
+        
+        # Count total
+        count_stmt = select(func.count()).select_from(Instruction).where(
+            Instruction.user_id == user_id,
+            Instruction.is_active == True
+        )
+        total_result = await self.db.execute(count_stmt)
+        total = total_result.scalar_one()
+
+        # Get page items
+        stmt = (
+            select(Instruction)
+            .where(Instruction.user_id == user_id)
+            .where(Instruction.is_active == True)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .order_by(Instruction.name.asc())  # Sort by name as updated_at is not available
+        )
+        result = await self.db.execute(stmt)
+        items = result.scalars().all()
+
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        }
+
     async def validate_mutex(self, actions: List[Dict[str, Any]], user_id: uuid.UUID) -> List[Dict[str, Any]]:
         """
         检查指令互斥逻辑

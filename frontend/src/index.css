@@ -54,6 +54,88 @@
     0%, 100% { opacity: 1; box-shadow: 0 0 20px var(--primary); }
     50% { opacity: 0.5; box-shadow: 0 0 10px var(--primary); }
   }
+
+  /* Shadcn UI Animations */
+  @keyframes enter {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes exit {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.95); }
+  }
+  @keyframes slide-in-from-top {
+    from { transform: translateY(-100%); }
+    to { transform: translateY(0); }
+  }
+  @keyframes slide-in-from-bottom {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  @keyframes slide-in-from-left {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+  }
+  @keyframes slide-in-from-right {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+  }
+  @keyframes slide-out-to-top {
+    from { transform: translateY(0); }
+    to { transform: translateY(-100%); }
+  }
+  @keyframes slide-out-to-bottom {
+    from { transform: translateY(0); }
+    to { transform: translateY(100%); }
+  }
+  @keyframes slide-out-to-left {
+    from { transform: translateX(0); }
+    to { transform: translateX(-100%); }
+  }
+  @keyframes slide-out-to-right {
+    from { transform: translateX(0); }
+    to { transform: translateX(100%); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  @keyframes zoom-in-95 {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  @keyframes zoom-out-95 {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.95); }
+  }
+}
+
+/* Animation Utilities (simulating tailwindcss-animate) */
+.animate-in { animation-name: enter; animation-duration: 150ms; --tw-enter-opacity: initial; --tw-enter-scale: initial; --tw-enter-rotate: initial; --tw-enter-translate-x: initial; --tw-enter-translate-y: initial; }
+.animate-out { animation-name: exit; animation-duration: 150ms; --tw-exit-opacity: initial; --tw-exit-scale: initial; --tw-exit-rotate: initial; --tw-exit-translate-x: initial; --tw-exit-translate-y: initial; }
+.fade-in-0 { animation-name: fade-in; }
+.fade-out-0 { animation-name: fade-out; }
+.zoom-in-95 { animation-name: zoom-in-95; }
+.zoom-out-95 { animation-name: zoom-out-95; }
+.slide-in-from-top-48 { animation-name: slide-in-from-top; } /* Simplified */
+.slide-in-from-left-1\/2 { animation-name: slide-in-from-left; } /* Simplified */
+
+/* Custom utility for Dialog Overlay/Content since the complex data attributes might not map 1:1 without the plugin */
+[data-state=open][data-slot=dialog-overlay] {
+  animation: fade-in 0.2s ease-out;
+}
+[data-state=closed][data-slot=dialog-overlay] {
+  animation: fade-out 0.2s ease-in;
+}
+[data-state=open][data-slot=dialog-content] {
+  animation: zoom-in-95 0.2s ease-out;
+}
+[data-state=closed][data-slot=dialog-content] {
+  animation: zoom-out-95 0.2s ease-in;
 }
 
 :root {

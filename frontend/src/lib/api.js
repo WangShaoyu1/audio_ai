@@ -13,8 +13,7 @@ const getHeaders = (isMultipart = false) => {
 
 const handleResponse = async (response) => {
   if (response.status === 401) {
-    localStorage.removeItem('token');
-    window.location.href = '/login';
+    window.dispatchEvent(new CustomEvent('auth:unauthorized'));
     throw new Error('Unauthorized');
   }
   if (!response.ok) {
@@ -41,6 +40,23 @@ export const api = {
     return handleResponse(response);
   },
 
+  put: async (url, data) => {
+    const response = await fetch(`${API_BASE}${url}`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  delete: async (url) => {
+    const response = await fetch(`${API_BASE}${url}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    return handleResponse(response);
+  },
+
   upload: async (url, formData) => {
     const response = await fetch(`${API_BASE}${url}`, {
       method: 'POST',
@@ -59,11 +75,24 @@ export const api = {
     });
     
     if (response.status === 401) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
       throw new Error('Unauthorized');
     }
     if (!response.ok) throw new Error('Download failed');
+    
+    return response.blob();
+  },
+
+  getFile: async (url) => {
+    const response = await fetch(`${API_BASE}${url}`, {
+      headers: getHeaders(),
+    });
+    
+    if (response.status === 401) {
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+      throw new Error('Unauthorized');
+    }
+    if (!response.ok) throw new Error('File fetch failed');
     
     return response.blob();
   }
