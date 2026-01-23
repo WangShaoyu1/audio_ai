@@ -1,13 +1,7 @@
 import { useEffect, useState } from "react";
+import { Button, Modal, Typography } from "antd";
 
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogTitle,
-} from "@/components/ui/dialog";
+const { Title, Text } = Typography;
 
 interface ManusDialogProps {
   title?: string;
@@ -46,40 +40,64 @@ export function ManusDialog({
     }
   };
 
+  const isOpen = onOpenChange ? open : internalOpen;
+
   return (
-    <Dialog
-      open={onOpenChange ? open : internalOpen}
-      onOpenChange={handleOpenChange}
-    >
-      <DialogContent className="py-5 bg-[#f8f8f7] rounded-[20px] w-[400px] shadow-[0px_4px_11px_0px_rgba(0,0,0,0.08)] border border-[rgba(0,0,0,0.08)] backdrop-blur-2xl p-0 gap-0 text-center">
-        <div className="flex flex-col items-center gap-2 p-5 pt-12">
-          {logo ? (
-            <div className="w-16 h-16 bg-white rounded-xl border border-[rgba(0,0,0,0.08)] flex items-center justify-center">
-              <img src={logo} alt="Dialog graphic" className="w-10 h-10 rounded-md" />
-            </div>
-          ) : null}
-
-          {/* Title and subtitle */}
-          {title ? (
-            <DialogTitle className="text-xl font-semibold text-[#34322d] leading-[26px] tracking-[-0.44px]">
-              {title}
-            </DialogTitle>
-          ) : null}
-          <DialogDescription className="text-sm text-[#858481] leading-5 tracking-[-0.154px]">
-            Please login with Manus to continue
-          </DialogDescription>
+    <Modal
+      open={isOpen}
+      onCancel={() => handleOpenChange(false)}
+      footer={null}
+      width={400}
+      centered
+      styles={{ 
+        body: {
+          padding: 0, 
+          backgroundColor: '#f8f8f7', 
+          borderRadius: 20, 
+          overflow: 'hidden' 
+        }
+      }}
+      closeIcon={null}
+      modalRender={(modal) => (
+        <div style={{ borderRadius: 20, overflow: 'hidden', boxShadow: '0px 4px 11px 0px rgba(0,0,0,0.08)' }}>
+          {modal}
         </div>
+      )}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '48px 20px 20px' }}>
+        {logo && (
+          <div style={{ width: 64, height: 64, background: 'white', borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+            <img src={logo} alt="Dialog graphic" style={{ width: 40, height: 40, borderRadius: 6 }} />
+          </div>
+        )}
 
-        <DialogFooter className="px-5 py-5">
-          {/* Login button */}
-          <Button
-            onClick={onLogin}
-            className="w-full h-10 bg-[#1a1a19] hover:bg-[#1a1a19]/90 text-white rounded-[10px] text-sm font-medium leading-5 tracking-[-0.154px]"
-          >
-            Login with Manus
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        {title && (
+          <Title level={4} style={{ margin: 0, color: '#34322d', fontSize: 20 }}>
+            {title}
+          </Title>
+        )}
+        <Text style={{ color: '#858481', fontSize: 14 }}>
+          Please login with Manus to continue
+        </Text>
+      </div>
+
+      <div style={{ padding: 20 }}>
+        <Button
+          type="primary"
+          block
+          onClick={onLogin}
+          style={{ 
+            height: 40, 
+            backgroundColor: '#1a1a19', 
+            borderRadius: 10,
+            fontSize: 14,
+            fontWeight: 500,
+            border: 'none'
+          }}
+        >
+          Login with Manus
+        </Button>
+      </div>
+    </Modal>
   );
 }

@@ -1,15 +1,22 @@
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 from app.api.endpoints import router as api_router
 from app.api.admin import router as admin_router
 from app.api.auth import router as auth_router
 from app.api.templates import router as templates_router
 from app.api.sessions import router as sessions_router
 from app.core.config import settings
-from app.core.middleware import log_requests
-from starlette.middleware.base import BaseHTTPMiddleware
+from app.core.redis import RedisClient
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title=settings.PROJECT_NAME)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    yield
+    # Shutdown
+    await RedisClient.close()
+
+app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
 
 # CORS Configuration
 app.add_middleware(

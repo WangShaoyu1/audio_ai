@@ -1,28 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
-import { Button } from "@/components/ui/button";
-import { Send, Plus, MessageSquare, MoreVertical, Trash, Edit2, RotateCcw } from "lucide-react";
-import { useLocation } from "wouter";
+import { useState, useEffect, useRef, memo, useCallback } from 'react';
+import { Button, Input, Dropdown, MenuProps, Tooltip, Checkbox, Spin, theme, App, Layout, Typography, Space, Modal, AutoComplete } from 'antd';
+import { SendOutlined, PlusOutlined, MessageOutlined, MoreOutlined, DeleteOutlined, EditOutlined, ReloadOutlined } from "@ant-design/icons";
+
+const { Header, Sider, Content } = Layout;
+const { Text, Title } = Typography;
+
 import { Message } from '@/lib/types';
 import JsonLogger from '@/components/JsonLogger';
-import { cn } from '@/lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { useTranslation } from "react-i18next";
 import { LanguageToggle } from "@/components/LanguageToggle";
 
@@ -34,9 +22,121 @@ interface Session {
 
 const BATCH_SIZE = 20;
 
+// Memoized Message Item Component
+const MessageItem = memo(({ msg, token, t, handleRetry }: { msg: Message, token: any, t: any, handleRetry: (id: string) => void }) => {
+  return (
+    <div id={`msg-${msg.id}`} style={{ display: 'flex', gap: 12, justifyContent: msg.role === 'user' ? "flex-end" : "flex-start", marginBottom: 16 }}>
+      <div 
+          style={{
+              maxWidth: '80%',
+              padding: 16,
+              borderRadius: 16,
+              borderTopRightRadius: msg.role === 'user' ? 0 : 16,
+              borderTopLeftRadius: msg.role === 'user' ? 16 : 0,
+              backgroundColor: msg.role === 'user' ? token.colorPrimary : token.colorFillSecondary,
+              color: msg.role === 'user' ? '#fff' : token.colorText,
+              fontSize: 14,
+              lineHeight: 1.6,
+              position: 'relative'
+          }}
+      >
+        {msg.role === 'user' ? (
+          msg.content
+        ) : (
+          <ReactMarkdown
+            children={msg.content}
+            remarkPlugins={[remarkGfm]}
+            components={{
+              code({node, inline, className, children, ...props}: any) {
+                const match = /language-(\w+)/.exec(className || '')
+                return !inline && match ? (
+                  <SyntaxHighlighter
+                    {...props}
+                    children={String(children).replace(/\n$/, '')}
+                    style={oneDark}
+                    language={match[1]}
+                    PreTag="div"
+                  />
+                ) : (
+                  <code {...props} className={className}>
+                    {children}
+                  </code>
+                )
+              }
+            }}
+          />
+        )}
+        
+        {(msg.latency || msg.ttft) && (
+          <div style={{ fontSize: 10, opacity: 0.5, marginTop: 4 }}>
+              {msg.ttft ? (
+                  <>
+                      {t("chat.ttft")}: {msg.ttft}ms | {t("chat.totalLatency")}: {msg.latency || '-'}ms
+                  </>
+              ) : (
+                  <>
+                      {t("chat.totalLatency")}: {msg.latency}ms
+                  </>
+              )}
+               | {t("chat.route")}: {msg.intent}
+          </div>
+        )}
+        {msg.role === 'assistant' && (msg.content === '' || msg.content.includes('[System Error:') || msg.isError) && (
+          <div style={{ position: 'absolute', bottom: 4, right: 4 }}>
+              <Tooltip title={t("common.retry")}>
+                  <Button 
+                      type="text"
+                      size="small" 
+                      onClick={() => handleRetry(msg.id)}
+                      icon={<ReloadOutlined style={{ color: token.colorText }} />}
+                  />
+              </Tooltip>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}, (prev, next) => {
+  return prev.msg.id === next.msg.id && 
+         prev.msg.content === next.msg.content && 
+         prev.msg.latency === next.msg.latency &&
+         prev.msg.ttft === next.msg.ttft &&
+         prev.msg.isError === next.msg.isError &&
+         prev.token.colorPrimary === next.token.colorPrimary;
+});
+
+// Memoized Message List Component
+const MessageList = memo(({ messages, token, t, handleRetry, isProcessing }: { messages: Message[], token: any, t: any, handleRetry: (id: string) => void, isProcessing: boolean }) => {
+  return (
+    <>
+      {messages.map(msg => (
+        <MessageItem key={msg.id} msg={msg} token={token} t={t} handleRetry={handleRetry} />
+      ))}
+      {isProcessing && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-start' }}>
+          <div 
+              style={{
+                  padding: 16,
+                  borderRadius: 16,
+                  borderTopLeftRadius: 0,
+                  backgroundColor: token.colorFillSecondary,
+                  color: token.colorTextSecondary,
+                  fontSize: 14
+              }}
+          >
+            <Spin size="small" />
+            <span style={{ marginLeft: 8 }}>{t("home.generating") || "..."}</span>
+          </div>
+        </div>
+      )}
+    </>
+  );
+});
+
 export default function Home() {
   const { t } = useTranslation();
-  useLocation();
+  const { token } = theme.useToken();
+  const { message, modal } = App.useApp();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isStream, setIsStream] = useState(true);
@@ -45,7 +145,6 @@ export default function Home() {
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [sessionToRename, setSessionToRename] = useState<Session | null>(null);
   const [newName, setNewName] = useState("");
-  const [deleteConfirmSessionId, setDeleteConfirmSessionId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [logClearTimestamp, setLogClearTimestamp] = useState(0);
@@ -55,6 +154,7 @@ export default function Home() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [targetMessageId, setTargetMessageId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSessions();
@@ -65,8 +165,27 @@ export default function Home() {
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isProcessing]);
+    if (!targetMessageId) {
+        scrollToBottom();
+    }
+  }, [messages, isProcessing, targetMessageId]);
+
+  // Scroll to target message if it exists
+  useEffect(() => {
+    if (targetMessageId && messages.length > 0) {
+        const el = document.getElementById(`msg-${targetMessageId}`);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Highlight effect
+            el.style.transition = 'background-color 0.5s';
+            el.style.backgroundColor = 'rgba(24, 144, 255, 0.1)';
+            setTimeout(() => {
+                el.style.backgroundColor = 'transparent';
+                setTargetMessageId(null);
+            }, 2000);
+        }
+    }
+  }, [messages, targetMessageId]);
 
   useEffect(() => {
     if (searchQuery.trim()) {
@@ -145,8 +264,10 @@ export default function Home() {
 
           if (isInitial) {
             setMessages(mappedMessages);
-            // Scroll to bottom after render
-            setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'auto' }), 100);
+            // Scroll to bottom after render if not targeting a message
+            if (!targetMessageId) {
+                setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'auto' }), 100);
+            }
           } else {
             const container = chatContainerRef.current;
             const oldHeight = container ? container.scrollHeight : 0;
@@ -175,12 +296,13 @@ export default function Home() {
     }
   };
 
-  const selectSession = async (sessionId: string) => {
+  const selectSession = async (sessionId: string, messageId?: string) => {
     setCurrentSessionId(sessionId);
     setMessages([]); 
     setLogClearTimestamp(0);
     setOffset(0);
     setHasMore(true);
+    setTargetMessageId(messageId || null);
     await loadHistory(sessionId, 0, true);
   };
 
@@ -199,10 +321,23 @@ export default function Home() {
       if (res.ok) {
         fetchSessions();
         setIsRenameDialogOpen(false);
+        message.success(t("home.renameSuccess") || "Session renamed successfully");
       }
     } catch (error) {
       console.error("Failed to rename session", error);
+      message.error(t("home.renameFailed") || "Failed to rename session");
     }
+  };
+
+  const confirmDeleteSession = (sessionId: string) => {
+    modal.confirm({
+      title: t("home.deleteSession"),
+      content: t("home.deleteSessionConfirm") || "Are you sure you want to delete this session?",
+      okText: t("home.confirm"),
+      cancelText: t("home.cancel"),
+      okType: 'danger',
+      onOk: () => deleteSession(sessionId),
+    });
   };
 
   const deleteSession = async (sessionId: string) => {
@@ -218,14 +353,33 @@ export default function Home() {
           setCurrentSessionId(null);
           setMessages([]);
         }
+        message.success(t("home.deleteSuccess") || "Session deleted successfully");
       }
     } catch (error) {
       console.error("Failed to delete session", error);
+      message.error(t("home.deleteFailed") || "Failed to delete session");
     }
   };
 
-  const handleRetry = (messageId: string) => {
-    const msgIndex = messages.findIndex(m => m.id === messageId);
+  const handleRetry = useCallback((messageId: string) => {
+    // Retry logic needs access to messages state, but since we are in useCallback, we need to be careful.
+    // However, if we pass handleRetry to memoized component, it should be stable.
+    // We can't use closure 'messages' here effectively if it's stale.
+    // Better to just let it re-create when messages change? 
+    // Or use functional update.
+    // For now, let's keep it simple. It will invalidate memo if messages change, which is fine.
+    // Wait, if handleRetry changes on every render, MemoizedMessageList will re-render.
+    // We need to use a ref or something.
+    // Actually, retry is rare. Re-rendering is fine on retry.
+    // The main issue is INPUT typing. 
+    // On input typing, 'messages' DOES NOT change. So handleRetry doesn't need to change if it depends on messages?
+    // Ah, 'messages' is a dependency of handleRetry.
+    // If messages don't change, handleRetry doesn't change.
+    // So it's fine.
+  }, [messages]); 
+
+  const realHandleRetry = (messageId: string) => {
+     const msgIndex = messages.findIndex(m => m.id === messageId);
     if (msgIndex === -1) return;
     
     const msg = messages[msgIndex];
@@ -242,8 +396,6 @@ export default function Home() {
 
     if (userMsgIndex !== -1) {
         const userContent = messages[userMsgIndex].content;
-        
-        // Trigger send as a new message (append to history)
         handleSendMessage(userContent);
     }
   };
@@ -258,6 +410,9 @@ export default function Home() {
   const handleSendMessage = async (text: string) => {
     if (!text.trim()) return;
     
+    const startTime = Date.now();
+    let ttfb: number | undefined;
+
     const userMsg: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -317,6 +472,10 @@ export default function Home() {
             const { done, value } = await reader.read();
             if (done) break;
             
+            if (ttfb === undefined) {
+              ttfb = Date.now() - startTime;
+            }
+
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split('\n');
             buffer = lines.pop() || '';
@@ -332,7 +491,8 @@ export default function Home() {
                     hasContent = true;
                     assistantMsg = {
                       ...assistantMsg,
-                      content: assistantMsg.content + data.content
+                      content: assistantMsg.content + data.content,
+                      ttft: ttfb
                     };
                     setMessages(prev => prev.map(msg => 
                       msg.id === assistantMsg.id ? assistantMsg : msg
@@ -342,7 +502,7 @@ export default function Home() {
                     assistantMsg = {
                       ...assistantMsg,
                       latency: data.metadata.latency?.total_ms,
-                      ttft: data.metadata.latency?.ttft_ms,
+                      ttft: data.metadata.latency?.ttft_ms || ttfb,
                       intent: data.metadata.route,
                       metadata: data.metadata
                     };
@@ -419,290 +579,231 @@ export default function Home() {
     }
   };
 
+  const getSessionMenuItems = (session: Session): MenuProps['items'] => [
+    {
+      key: 'rename',
+      label: t("home.rename"),
+      icon: <EditOutlined />,
+      onClick: ({ domEvent }) => {
+        domEvent.stopPropagation();
+        setSessionToRename(session);
+        setNewName(session.name);
+        setIsRenameDialogOpen(true);
+      }
+    },
+    {
+      key: 'delete',
+      label: t("home.deleteSession"),
+      icon: <DeleteOutlined />,
+      danger: true,
+      onClick: ({ domEvent }) => {
+        domEvent.stopPropagation();
+        confirmDeleteSession(session.id);
+      }
+    }
+  ];
+
   return (
-    <div className="h-full flex bg-background text-foreground overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-64 border-r border-border bg-card/50 flex flex-col">
-        <div className="p-4 border-b border-border">
-           <Input 
-             placeholder={t("home.searchPlaceholder")}
-             className="h-9" 
-             value={searchQuery}
-             onChange={(e) => setSearchQuery(e.target.value)}
-           />
-        </div>
-        
-        <div className="p-4">
-          <Button onClick={createSession} className="w-full justify-start gap-2" variant="outline">
-            <Plus className="w-4 h-4" />
-            {t("home.newChat")}
-          </Button>
-        </div>
+    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
+      <Sider 
+        width={260} 
+        theme="light" 
+        style={{ 
+          borderRight: `1px solid ${token.colorBorder}`,
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div style={{ padding: 16, borderBottom: `1px solid ${token.colorBorder}` }}>
+               <AutoComplete
+                 style={{ width: '100%' }}
+                 placeholder={t("home.searchPlaceholder")}
+                 value={searchQuery}
+                 onChange={(value) => setSearchQuery(value)}
+                 onSelect={(value, option) => selectSession(option.session_id, option.key)}
+                 options={searchResults.map((result: any) => ({
+                   value: result.session_name,
+                   label: (
+                     <div style={{ display: 'flex', flexDirection: 'column' }}>
+                       <Text strong ellipsis>{result.session_name}</Text>
+                       <Text type="secondary" ellipsis style={{ fontSize: 12 }}>{result.content}</Text>
+                     </div>
+                   ),
+                   key: result.id,
+                   session_id: result.session_id
+                 }))}
+                 backfill={false}
+               >
+                 <Input.Search allowClear />
+               </AutoComplete>
+            </div>
+            
+            <div style={{ padding: 16 }}>
+              <Button onClick={createSession} block icon={<PlusOutlined />} type="primary">
+                {t("home.newChat")}
+              </Button>
+            </div>
 
-        <div className="flex-1 overflow-y-auto px-2 space-y-1">
-          {searchQuery ? (
-            searchResults.length > 0 ? (
-              searchResults.map((result, idx) => (
-                <div 
-                  key={idx}
-                  className="p-2 rounded-md cursor-pointer hover:bg-accent/50 transition-colors text-muted-foreground"
-                  onClick={() => selectSession(result.session_id)}
-                >
-                  <div className="flex items-center gap-2 overflow-hidden mb-1">
-                    <MessageSquare className="w-3 h-3 flex-shrink-0" />
-                    <span className="truncate text-xs font-medium">{result.session_name}</span>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px' }}>
+                {sessions.map(session => (
+                  <div 
+                    key={session.id}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: 8,
+                        borderRadius: token.borderRadius,
+                        cursor: 'pointer',
+                        marginBottom: 4,
+                        backgroundColor: currentSessionId === session.id ? token.colorPrimaryBg : 'transparent',
+                        color: currentSessionId === session.id ? token.colorPrimary : token.colorTextSecondary
+                    }}
+                    onMouseEnter={(e) => {
+                        if (currentSessionId !== session.id) e.currentTarget.style.backgroundColor = token.colorFillTertiary;
+                    }}
+                    onMouseLeave={(e) => {
+                        if (currentSessionId !== session.id) e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                    onClick={() => selectSession(session.id)}
+                  >
+                    <Space style={{ overflow: 'hidden', flex: 1 }}>
+                      <MessageOutlined />
+                      <Text ellipsis style={{ fontSize: 14, color: 'inherit' }}>{session.name}</Text>
+                    </Space>
+                    
+                    <Dropdown menu={{ items: getSessionMenuItems(session) }} trigger={['click']}>
+                      <Button 
+                        type="text" 
+                        size="small" 
+                        icon={<MoreOutlined />} 
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ opacity: 0.5 }}
+                        onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                        onMouseLeave={(e) => e.currentTarget.style.opacity = '0.5'}
+                      />
+                    </Dropdown>
                   </div>
-                  <div className="text-xs truncate pl-5 opacity-80">
-                    {result.content}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="p-4 text-center text-sm text-muted-foreground">
-                {t("home.searchPlaceholder")}
-              </div>
-            )
-          ) : (
-            sessions.map(session => (
-              <div 
-                key={session.id}
-                className={cn(
-                  "group flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-accent/50 transition-colors",
-                  currentSessionId === session.id ? "bg-accent text-accent-foreground" : "text-muted-foreground"
-                )}
-                onClick={() => selectSession(session.id)}
-              >
-                <div className="flex items-center gap-2 overflow-hidden flex-1">
-                  <MessageSquare className="w-4 h-4 flex-shrink-0" />
-                  <span className="truncate text-sm">{session.name}</span>
-                </div>
-                
-                <DropdownMenu onOpenChange={(open) => !open && setDeleteConfirmSessionId(null)}>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreVertical className="w-3 h-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-32">
-                    <DropdownMenuItem onClick={(e) => { 
-                      e.stopPropagation(); 
-                      setSessionToRename(session); 
-                      setNewName(session.name); 
-                      setIsRenameDialogOpen(true); 
-                    }}>
-                      <Edit2 className="w-3 h-3 mr-2" />
-                      <span>{t("home.rename")}</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onSelect={(e) => {
-                        if (deleteConfirmSessionId !== session.id) {
-                          e.preventDefault();
-                          setDeleteConfirmSessionId(session.id);
-                        }
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      {deleteConfirmSessionId === session.id ? (
-                        <div className="flex items-center justify-between w-full gap-2">
-                           <span 
-                              className="font-medium cursor-pointer hover:underline"
-                              onClick={(e) => {
-                                 e.stopPropagation(); // Prevent item click
-                                 deleteSession(session.id);
-                                 setDeleteConfirmSessionId(null);
-                                 // The menu will close automatically if we don't prevent it, 
-                                 // but here we are inside an onClick that stops propagation.
-                                 // We might want to let the menu close now.
-                                 // Actually, deleteSession re-fetches sessions, which might unmount this component.
-                                 // But to be safe, we can rely on the re-render.
-                                 // If we want to close the menu, we might need to trigger a click outside or not stop propagation?
-                                 // If I stop propagation, the menu won't know a click happened.
-                                 // Wait, if I delete the session, the row disappears, so the menu disappears.
-                                 // So it should be fine.
-                              }}
-                           >
-                              {t("home.confirm")}
-                           </span>
-                           <span 
-                              className="text-muted-foreground cursor-pointer hover:underline text-xs"
-                              onClick={(e) => {
-                                 e.stopPropagation();
-                                 setDeleteConfirmSessionId(null);
-                              }}
-                           >
-                              {t("home.cancel")}
-                           </span>
-                        </div>
-                      ) : (
-                        <>
-                          <Trash className="w-3 h-3 mr-2" />
-                          <span>{t("home.deleteSession")}</span>
-                        </>
-                      )}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))
-          )}
+                ))
+              }
+            </div>
         </div>
-      </aside>
+      </Sider>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        <header className="h-14 border-b border-border flex items-center justify-between px-6 bg-card/50 backdrop-blur">
-           <div className="flex items-center gap-4">
-             <h2 className="font-semibold">
+      <Layout>
+        <Header 
+            style={{ 
+                padding: '0 24px', 
+                background: token.colorBgContainer, 
+                borderBottom: `1px solid ${token.colorBorder}`, 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'space-between',
+                height: 64
+            }}
+        >
+           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+             <Title level={4} style={{ margin: 0 }}>
                {sessions.find(s => s.id === currentSessionId)?.name || t("home.newChat")}
-             </h2>
+             </Title>
            </div>
-           <div className="flex items-center gap-2">
+           <Space>
              <LanguageToggle />
-           </div>
-        </header>
+           </Space>
+        </Header>
 
-        <main className="flex-1 overflow-hidden flex p-6 gap-6">
-           <div className="flex-1 flex flex-col gap-6 max-w-4xl mx-auto w-full">
+        <Content style={{ padding: 24, display: 'flex', gap: 24, overflow: 'hidden', background: token.colorBgLayout }}>
+           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 24, maxWidth: 900, margin: '0 auto', width: '100%', height: '100%' }}>
               {/* Chat History & Input */}
-              <div className="flex-1 flex flex-col gap-4 min-h-0">
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
                  <div 
                    ref={chatContainerRef} 
                    onScroll={handleScroll} 
-                   className="flex-1 overflow-y-auto space-y-4 pr-2"
+                   style={{ flex: 1, overflowY: 'auto', paddingRight: 8 }}
                  >
                     {isLoadingHistory && messages.length > 0 && (
-                        <div className="flex justify-center py-2">
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                        <div style={{ display: 'flex', justifyContent: 'center', padding: 8 }}>
+                            <Spin />
                         </div>
                     )}
-                    {messages.map(msg => (
-                      <div key={msg.id} className={cn("flex gap-3", msg.role === 'user' ? "justify-end" : "justify-start")}>
-                        <div className={cn(
-                          "max-w-[80%] p-3 rounded-2xl text-sm relative group",
-                          msg.role === 'user' 
-                            ? "bg-primary text-primary-foreground rounded-tr-none" 
-                            : "bg-muted text-muted-foreground rounded-tl-none"
-                        )}>
-                          {msg.role === 'user' ? (
-                            msg.content
-                          ) : (
-                            <ReactMarkdown
-                              children={msg.content}
-                              remarkPlugins={[remarkGfm]}
-                              components={{
-                                code({node, inline, className, children, ...props}: any) {
-                                  const match = /language-(\w+)/.exec(className || '')
-                                  return !inline && match ? (
-                                    <SyntaxHighlighter
-                                      {...props}
-                                      children={String(children).replace(/\n$/, '')}
-                                      style={oneDark}
-                                      language={match[1]}
-                                      PreTag="div"
-                                    />
-                                  ) : (
-                                    <code {...props} className={className}>
-                                      {children}
-                                    </code>
-                                  )
-                                }
-                              }}
-                            />
-                          )}
-                          {msg.latency && (
-                            <div className="text-[10px] opacity-50 mt-1">
-                                {msg.ttft ? (
-                                    <>
-                                        {t("chat.ttft")}: {msg.ttft}ms | {t("chat.totalLatency")}: {msg.latency}ms
-                                    </>
-                                ) : (
-                                    <>
-                                        {t("chat.totalLatency")}: {msg.latency}ms
-                                    </>
-                                )}
-                                | {t("chat.route")}: {msg.intent}
-                            </div>
-                          )}
-                          {msg.role === 'assistant' && (msg.content === '' || msg.content.includes('[System Error:') || msg.isError) && (
-                            <div className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button 
-                                    variant="ghost"
-                                    size="icon" 
-                                    className="h-6 w-6 hover:bg-background/20"
-                                    onClick={() => handleRetry(msg.id)}
-                                    title={t("common.retry")}
-                                >
-                                    <RotateCcw className="w-3.5 h-3.5" />
-                                </Button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                    {isProcessing && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
-                      <div className="flex gap-3 justify-start">
-                        <div className="bg-muted text-muted-foreground p-3 rounded-2xl rounded-tl-none text-sm">
-                          <span className="animate-pulse">{t("home.generating") || "..."}</span>
-                        </div>
-                      </div>
-                    )}
+                    
+                    <MessageList 
+                      messages={messages} 
+                      token={token} 
+                      t={t} 
+                      handleRetry={realHandleRetry}
+                      isProcessing={isProcessing}
+                    />
+
                     <div ref={chatEndRef} />
                  </div>
 
-                 <div className="bg-card border border-border rounded-xl p-2 flex gap-2">
-                    <Input
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleSendMessage(input)}
-                      placeholder={t("home.inputPlaceholder")}
-                      className="border-none focus-visible:ring-0 bg-transparent"
-                    />
-                    <Button size="icon" onClick={() => handleSendMessage(input)}>
-                      <Send className="w-4 h-4" />
-                    </Button>
-                 </div>
-                 <div className="flex items-center gap-2 px-2">
-                    <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={isStream} 
-                        onChange={(e) => setIsStream(e.target.checked)}
-                        className="rounded border-gray-300 text-primary focus:ring-primary"
-                      />
-                      {t("home.streamResponse")}
-                    </label>
+                 <div style={{ padding: '0 4px' }}>
+                    <div style={{ 
+                        border: `1px solid ${token.colorBorder}`, 
+                        borderRadius: 12, 
+                        backgroundColor: token.colorBgContainer,
+                        padding: 12,
+                        boxShadow: token.boxShadowTertiary
+                    }}>
+                        <Input.TextArea
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSendMessage(input);
+                                }
+                            }}
+                            placeholder={t("home.inputPlaceholder")}
+                            autoSize={{ minRows: 1, maxRows: 6 }}
+                            bordered={false}
+                            style={{ resize: 'none', marginBottom: 8 }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Checkbox 
+                                checked={isStream} 
+                                onChange={(e) => setIsStream(e.target.checked)}
+                            >
+                                {t("home.streamResponse")}
+                            </Checkbox>
+                            <Button 
+                                type="primary" 
+                                icon={<SendOutlined />} 
+                                onClick={() => handleSendMessage(input)}
+                                loading={isProcessing}
+                                disabled={!input.trim()}
+                            >
+                                {t("chat.send")}
+                            </Button>
+                        </div>
+                    </div>
                  </div>
               </div>
            </div>
-
-           {/* Right Panel */}
-           <div className="w-80 flex flex-col gap-6">
+           
+           <div style={{ width: 400, display: 'flex', flexDirection: 'column' }}>
               <JsonLogger 
                 messages={messages.filter(m => m.timestamp > logClearTimestamp)} 
                 onClear={() => setLogClearTimestamp(Date.now())} 
               />
            </div>
-        </main>
-      </div>
+        </Content>
+      </Layout>
 
-      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("home.renameSession")}</DialogTitle>
-          </DialogHeader>
-          <Input value={newName} onChange={(e) => setNewName(e.target.value)} />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRenameDialogOpen(false)}>{t("home.cancel")}</Button>
-            <Button onClick={renameSession}>{t("home.save")}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+      <Modal
+        title={t("home.renameSession")}
+        open={isRenameDialogOpen}
+        onOk={renameSession}
+        onCancel={() => setIsRenameDialogOpen(false)}
+        okText={t("home.save")}
+        cancelText={t("home.cancel")}
+      >
+        <Input 
+          value={newName} 
+          onChange={(e) => setNewName(e.target.value)} 
+          onPressEnter={renameSession}
+        />
+      </Modal>
+    </Layout>
   );
 }

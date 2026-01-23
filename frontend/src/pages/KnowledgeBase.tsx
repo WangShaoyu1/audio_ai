@@ -1,47 +1,24 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { toast } from "sonner";
-import { Upload, FileText, Trash2, RefreshCw, Search, Settings, Save, Database, ArrowLeft, CheckCircle2 } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
+import {
+  Table, Button, Card, Input, Modal, Form, Select,
+  Switch, Slider, Progress, Badge, Tooltip, App,
+  Upload as AntUpload, Row, Col, List, Typography,
+  Space, Empty, Spin
+} from "antd";
+import { 
+  FileTextOutlined, DeleteOutlined, ReloadOutlined, 
+  SearchOutlined, SettingOutlined, 
+  DatabaseOutlined, ArrowLeftOutlined, UploadOutlined,
+  CheckCircleOutlined, PlayCircleOutlined
+} from "@ant-design/icons";
 import { LanguageToggle } from "@/components/LanguageToggle";
-import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 // @ts-ignore
 import { api } from "@/lib/api";
+import embeddingModelsConfig from "@/config/embeddingModels.json";
+
+const { Option } = Select;
+const { Title, Text, Paragraph } = Typography;
 
 interface Document {
   id: string;
@@ -51,6 +28,7 @@ interface Document {
   provider?: string;
   model?: string;
   is_configured: boolean;
+  file_path?: string; 
 }
 
 interface RAGConfig {
@@ -71,6 +49,7 @@ interface TestRecord {
 
 export default function KnowledgeBase() {
   const { t } = useTranslation();
+  const { message, modal } = App.useApp();
   
   // View State
   const [view, setView] = useState<'list' | 'test'>('list');
@@ -79,9 +58,8 @@ export default function KnowledgeBase() {
   // Document List State
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(false);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const pageSize = 10;
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 10, total: 0 });
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Upload State
   const [uploading, setUploading] = useState(false);
@@ -89,17 +67,16 @@ export default function KnowledgeBase() {
   
   // RAG Config State
   const [ragConfig, setRagConfig] = useState<RAGConfig | null>(null);
-  const [savingConfig, setSavingConfig] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [configForm] = Form.useForm();
 
-  // Recall Test State
-  const [query, setQuery] = useState("");
-  const [testing, setTesting] = useState(false);
-  const [testHistory, setTestHistory] = useState<TestRecord[]>([]);
-  const [selectedTest, setSelectedTest] = useState<TestRecord | null>(null);
-
-  // Delete State
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  // Index State
+  const [indexModalOpen, setIndexModalOpen] = useState(false);
+  const [indexDocId, setIndexDocId] = useState<string | null>(null);
+  const [indexForm] = Form.useForm();
+  const [indexing, setIndexing] = useState(false);
+  const [ollamaModels, setOllamaModels] = useState<string[]>([]);
 
   // Preview State
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -108,6 +85,13 @@ export default function KnowledgeBase() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewObjectUrl, setPreviewObjectUrl] = useState<string | null>(null);
 
+  // Recall Test State
+  const [query, setQuery] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testHistory, setTestHistory] = useState<TestRecord[]>([]);
+  const [selectedTest, setSelectedTest] = useState<TestRecord | null>(null);
+
+  // Cleanup Preview URL
   useEffect(() => {
     return () => {
       if (previewObjectUrl) {
@@ -116,37 +100,51 @@ export default function KnowledgeBase() {
     };
   }, [previewObjectUrl]);
 
-  // Index State
-  const [indexId, setIndexId] = useState<string | null>(null);
-  const [indexProvider, setIndexProvider] = useState("openai");
-  const [indexModel, setIndexModel] = useState("text-embedding-3-small");
-  const [indexing, setIndexing] = useState(false);
-  const [ollamaModels, setOllamaModels] = useState<string[]>([]);
-
+  // Initial Fetch
   useEffect(() => {
-    if (indexProvider === 'ollama') {
-      api.get('/admin/ollama/models')
-        .then((data: any) => {
-             if (data.models && Array.isArray(data.models)) {
-                 setOllamaModels(data.models);
-             }
-        })
-        .catch((err: any) => {
-            console.error("Failed to fetch Ollama models", err);
-            // Fallback to default list if fetch fails is handled in render
-        });
-    }
-  }, [indexProvider]);
+    fetchDocuments(1);
+    fetchConfig();
+  }, []);
 
-  const fetchDocuments = async (pageNum = 1) => {
+  // Fetch Ollama models when provider changes in Index Form
+  const handleIndexProviderChange = async (provider: string) => {
+    // Clear model selection when provider changes
+    indexForm.setFieldValue('model', undefined);
+    if (provider === 'ollama') {
+      try {
+        const data = await api.get('/admin/ollama/models');
+        if (data.models && Array.isArray(data.models)) {
+          // Filter models to only show known embedding models
+          const knownModels = (embeddingModelsConfig as any).ollama.known_embedding_models || [];
+          const filteredModels = data.models.filter((m: string) =>
+            knownModels.some((known: string) => m.toLowerCase().includes(known.toLowerCase()))
+          );
+          setOllamaModels(filteredModels);
+        }
+      } catch (err) {
+        console.error("Failed to fetch Ollama models", err);
+      }
+    }
+  };
+
+  const fetchDocuments = async (pageNum = 1, query = searchQuery) => {
     setLoading(true);
     try {
-      const data = await api.get(`/admin/documents?page=${pageNum}&page_size=${pageSize}`);
+      const url = new URL("/admin/documents", window.location.origin);
+      url.searchParams.append("page", pageNum.toString());
+      url.searchParams.append("page_size", pagination.pageSize.toString());
+      if (query) {
+        url.searchParams.append("keyword", query);
+      }
+      const data = await api.get(url.toString().replace(window.location.origin, '')); // api.get expects path
       setDocuments(data.items);
-      setTotalPages(data.pages);
-      setPage(data.page);
+      setPagination({
+        ...pagination,
+        current: data.page,
+        total: data.total || data.pages * pagination.pageSize,
+      });
     } catch (error) {
-      toast.error(t("kb.loadError"));
+      message.error(t("kb.loadError"));
     } finally {
       setLoading(false);
     }
@@ -176,41 +174,15 @@ export default function KnowledgeBase() {
     }
   };
 
-  useEffect(() => {
-    fetchDocuments();
-    fetchConfig();
-    // fetchTestHistory(); // Don't fetch global history on mount anymore
-  }, []);
+  // --- Handlers ---
 
-  const handlePreview = async (doc: Document) => {
-    setPreviewDoc(doc);
-    setPreviewOpen(true);
-    setPreviewLoading(true);
-    try {
-      const response = await api.get(`/admin/documents/${doc.id}`);
-      setPreviewContent(response.content || t("kb.noContent"));
-    } catch (error) {
-      console.error(error);
-      toast.error(t("kb.previewError"));
-      setPreviewContent(t("kb.previewError"));
-    } finally {
-      setPreviewLoading(false);
-    }
-  };
-
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const handleUpload = async (file: File) => {
     setUploading(true);
     setUploadProgress(0);
     
-    // Simulate progress since fetch doesn't support upload progress
+    // Simulate progress
     const progressInterval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 90) return prev;
-        return prev + 10;
-      });
+      setUploadProgress(prev => (prev >= 90 ? prev : prev + 10));
     }, 200);
 
     const formData = new FormData();
@@ -223,90 +195,147 @@ export default function KnowledgeBase() {
       setUploadProgress(100);
       
       if (response && response.status === 'failed') {
-        toast.error(t("kb.uploadFailed") + ": " + (response.error_msg || "Unknown error"));
+        message.error(t("kb.uploadFailed") + ": " + (response.error_msg || "Unknown error"));
       } else {
-        toast.success(t("kb.uploadSuccess"));
+        message.success(t("kb.uploadSuccess"));
       }
 
       fetchDocuments(1);
     } catch (error) {
       clearInterval(progressInterval);
-      toast.error(t("kb.uploadError"));
-      fetchDocuments(page);
+      message.error(t("kb.uploadError"));
+      fetchDocuments(pagination.current);
     } finally {
       setTimeout(() => {
         setUploading(false);
         setUploadProgress(0);
       }, 500);
-      e.target.value = "";
     }
   };
 
-  const confirmDelete = async () => {
-    if (!deleteId) return;
+  const handleDelete = (doc: Document) => {
+    modal.confirm({
+      title: t('kb.confirmDelete'),
+      content: t('kb.deleteWarning'),
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          await api.delete(`/admin/documents/${doc.id}`);
+          message.success(t("kb.docDeleted"));
+          fetchDocuments(pagination.current);
+        } catch (error) {
+          message.error("Failed to delete document");
+        }
+      }
+    });
+  };
+
+  const handlePreview = async (doc: Document) => {
+    setPreviewDoc(doc);
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    setPreviewContent("");
+    
+    if (previewObjectUrl) {
+      URL.revokeObjectURL(previewObjectUrl);
+      setPreviewObjectUrl(null);
+    }
+
     try {
-      await api.delete(`/admin/documents/${deleteId}`);
-      toast.success(t("kb.docDeleted"));
-      fetchDocuments(page);
+      // Try to fetch raw file first
+      const blob = await api.getFile(`/admin/documents/${doc.id}/file`);
+      const url = URL.createObjectURL(blob);
+      setPreviewObjectUrl(url);
+
+      // For text-based files, also read content for potential fallback display
+      const ext = doc.filename.split('.').pop()?.toLowerCase();
+      if (['txt', 'md', 'json', 'log', 'csv'].includes(ext || '')) {
+          const text = await blob.text();
+          setPreviewContent(text);
+      }
     } catch (error) {
-      toast.error("Failed to delete document");
+      console.error(error);
+      // Fallback to text content API if file fetch fails
+      try {
+        const response = await api.get(`/admin/documents/${doc.id}`);
+        setPreviewContent(response.content || t("kb.noContent"));
+      } catch (e) {
+         message.error(t("kb.previewError"));
+         setPreviewContent(t("kb.previewError"));
+      }
     } finally {
-      setDeleteId(null);
+      setPreviewLoading(false);
     }
   };
 
-  const confirmIndex = async () => {
-    if (!indexId) return;
-    setIndexing(true);
-    try {
-      await api.post(`/admin/documents/${indexId}/index`, {
-        provider: indexProvider,
-        model: indexModel
-      });
-      toast.success(t("kb.indexingSuccess"));
-      fetchDocuments(page);
-    } catch (error) {
-      toast.error(t("kb.indexingError"));
-    } finally {
-      setIndexing(false);
-      setIndexId(null);
-    }
-  };
-
-  const openConfig = (doc: Document) => {
+  const handleOpenConfig = (doc: Document) => {
     setSelectedDoc(doc);
+    if (ragConfig) {
+      configForm.setFieldsValue(ragConfig);
+    }
     setConfigOpen(true);
   };
 
-  const saveConfig = async () => {
-    if (!ragConfig || !selectedDoc) return;
-    setSavingConfig(true);
+  const handleSaveConfig = async () => {
     try {
+      const values = await configForm.validateFields();
+      setSavingConfig(true);
+      
       // 1. Save global config
-      await api.put("/admin/rag/config", ragConfig);
+      await api.put("/admin/rag/config", values);
+      setRagConfig(values);
 
       // 2. Update document config status
-      await api.put(`/admin/documents/${selectedDoc.id}/config_status?is_configured=true`, {});
+      if (selectedDoc) {
+        await api.put(`/admin/documents/${selectedDoc.id}/config_status?is_configured=true`, {});
+      }
 
-      toast.success(t("kb.configSaved"));
+      message.success(t("kb.configSaved"));
       setConfigOpen(false);
-      fetchDocuments(page);
+      fetchDocuments(pagination.current);
     } catch (e) {
-      toast.error(t("kb.configSaveError"));
+      message.error(t("kb.configSaveError"));
     } finally {
       setSavingConfig(false);
     }
   };
 
-  const openTest = (doc: Document) => {
+  const handleOpenIndex = (doc: Document) => {
+    setIndexDocId(doc.id);
+    indexForm.setFieldsValue({
+      provider: 'openai',
+      model: 'text-embedding-3-small'
+    });
+    setIndexModalOpen(true);
+  };
+
+  const handleIndex = async () => {
+    try {
+      const values = await indexForm.validateFields();
+      if (!indexDocId) return;
+
+      setIndexing(true);
+      await api.post(`/admin/documents/${indexDocId}/index`, {
+        provider: values.provider,
+        model: values.model
+      });
+      message.success(t("kb.indexingSuccess"));
+      setIndexModalOpen(false);
+      fetchDocuments(pagination.current);
+    } catch (error) {
+      message.error(t("kb.indexingError"));
+    } finally {
+      setIndexing(false);
+    }
+  };
+
+  const handleOpenTest = (doc: Document) => {
     setSelectedDoc(doc);
     setView('test');
-    // Clear previous test state
     setQuery("");
     setTestHistory([]);
     setSelectedTest(null);
-    // Fetch test history specific to this doc
-    fetchTestHistory(doc.id); 
+    fetchTestHistory(doc.id);
   };
 
   const handleRecallTest = async () => {
@@ -335,541 +364,478 @@ export default function KnowledgeBase() {
       setQuery("");
       
     } catch (error) {
-      toast.error(t("kb.testError"));
+      message.error(t("kb.testError"));
     } finally {
       setTesting(false);
     }
   };
 
-  // Render Recall Test View
+  // --- Renderers ---
+
+  const columns = [
+    {
+      title: t("kb.colFilename"),
+      dataIndex: 'filename',
+      key: 'filename',
+      render: (text: string, record: Document) => (
+        <Space>
+          <FileTextOutlined style={{ color: '#1890ff' }} />
+          <Button type="link" onClick={() => handlePreview(record)} style={{ padding: 0 }}>
+            {text}
+          </Button>
+          {record.provider && (
+            <Text type="secondary" style={{ fontSize: 12 }}>{record.provider}/{record.model}</Text>
+          )}
+        </Space>
+      ),
+    },
+    {
+      title: t("kb.headerIndexStatus"),
+      key: 'status',
+      render: (_: any, record: Document) => {
+        let statusColor = 'default';
+        let statusText = t("kb.statusIndexUnindexed");
+        
+        if (record.status === 'indexed') {
+          statusColor = 'success';
+          statusText = t("kb.statusIndexed");
+        } else if (record.status === 'processing') {
+          statusColor = 'processing';
+          statusText = t("kb.statusProcessing");
+        } else if (record.status === 'failed') {
+          statusColor = 'error';
+          statusText = t("kb.statusFailed");
+        }
+
+        return <Badge status={statusColor as any} text={statusText} />;
+      }
+    },
+    {
+      title: t("kb.headerRagStatus"),
+      key: 'is_configured',
+      render: (_: any, record: Document) => (
+        <Badge 
+          status={record.is_configured ? 'success' : 'warning'} 
+          text={record.is_configured ? t("kb.statusConfigured") : t("kb.statusUnconfigured")} 
+        />
+      )
+    },
+    {
+      title: t("kb.colDate"),
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (date: string) => new Date(date).toLocaleDateString(),
+    },
+    {
+      title: t("kb.colActions"),
+      key: 'actions',
+      align: 'right' as const,
+      render: (_: any, record: Document) => (
+        <Space>
+          <Tooltip title={t("kb.tooltipIndex")}>
+            <Button 
+              icon={<DatabaseOutlined />} 
+              size="small" 
+              onClick={() => handleOpenIndex(record)}
+            />
+          </Tooltip>
+          <Tooltip title={t("kb.tooltipConfig")}>
+            <Button 
+              icon={<SettingOutlined />} 
+              size="small" 
+              onClick={() => handleOpenConfig(record)} 
+              disabled={record.status !== 'indexed'}
+            />
+          </Tooltip>
+          <Tooltip title={t("kb.tooltipTest") === "kb.tooltipTest" ? "召回测试" : t("kb.tooltipTest")}>
+            <Button 
+              icon={<PlayCircleOutlined />} 
+              size="small" 
+              onClick={() => handleOpenTest(record)}
+              disabled={record.status !== 'indexed' || !record.is_configured}
+            >
+              召回测试
+            </Button>
+          </Tooltip>
+          <Tooltip title={t("kb.delete")}>
+            <Button 
+              danger 
+              icon={<DeleteOutlined />} 
+              size="small" 
+              onClick={() => handleDelete(record)} 
+            />
+          </Tooltip>
+        </Space>
+      ),
+    },
+  ];
+
+  // Render Test View
   if (view === 'test' && selectedDoc) {
     return (
-      <div className="container mx-auto p-6 space-y-6 h-[calc(100vh-100px)] flex flex-col">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={() => setView('list')}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
+      <div style={{ padding: 24, height: 'calc(100vh - 0px)', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+          <Space>
+            <Button icon={<ArrowLeftOutlined />} onClick={() => setView('list')}>
               {t("kb.back")}
             </Button>
-            <h1 className="text-2xl font-bold">{t("kb.tabTest")}: {selectedDoc.filename}</h1>
-          </div>
+            <Title level={4} style={{ margin: 0 }}>{t("kb.tabTest")}: {selectedDoc.filename}</Title>
+          </Space>
           <LanguageToggle />
         </div>
 
-        <div className="flex gap-4 flex-1 min-h-0">
-          {/* Left Panel: Chat Interface */}
-          <Card className="flex-1 flex flex-col w-1/3">
-            <CardHeader className="pb-3 border-b">
-              <CardTitle className="text-lg">{t("kb.testHistory")}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 overflow-hidden p-0 bg-muted/10 relative">
-              <ScrollArea className="h-full px-4 py-4">
-                <div className="space-y-6">
-                  {testHistory.length === 0 ? (
-                    <div className="text-center text-sm text-muted-foreground py-8">
-                      {t("kb.testNoHistory")}
-                    </div>
-                  ) : (
-                    [...testHistory].reverse().map((test) => (
-                      <div key={test.id} className="space-y-4">
-                         {/* User Query Bubble */}
-                         <div className="flex justify-end">
-                           <div className="bg-primary text-primary-foreground px-4 py-2 rounded-2xl rounded-tr-sm max-w-[90%] text-sm shadow-sm">
-                             {test.query}
-                           </div>
+        <Row gutter={16} style={{ flex: 1, overflow: 'hidden' }}>
+          {/* History Panel */}
+          <Col span={8} style={{ height: '100%' }}>
+            <Card title={t("kb.testHistory")} style={{ height: '100%', display: 'flex', flexDirection: 'column' }} bodyStyle={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: 0 }}>
+               <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+                 <List
+                   dataSource={[...testHistory].reverse()}
+                   renderItem={item => (
+                     <List.Item 
+                        onClick={() => setSelectedTest(item)}
+                        style={{ 
+                          cursor: 'pointer', 
+                          backgroundColor: selectedTest?.id === item.id ? 'rgba(0,0,0,0.02)' : undefined,
+                          border: selectedTest?.id === item.id ? '1px solid #1890ff' : undefined,
+                          borderRadius: 8,
+                          padding: 12,
+                          marginBottom: 8,
+                          display: 'block'
+                        }}
+                     >
+                       <div style={{ textAlign: 'right', marginBottom: 8 }}>
+                          <span style={{ background: '#1890ff', color: 'white', padding: '4px 8px', borderRadius: 12, fontSize: 12 }}>
+                            {item.query}
+                          </span>
+                       </div>
+                       <div>
+                         <Space>
+                           <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                           <Text type="secondary" style={{ fontSize: 12 }}>
+                             {t("kb.testResults")} ({item.results?.length || 0})
+                           </Text>
+                         </Space>
+                         <div style={{ fontSize: 10, color: '#999', marginTop: 4 }}>
+                           {new Date(item.created_at).toLocaleTimeString()}
                          </div>
+                       </div>
+                     </List.Item>
+                   )}
+                 />
+                 {testHistory.length === 0 && <Empty description={t("kb.testNoHistory")} image={Empty.PRESENTED_IMAGE_SIMPLE} />}
+               </div>
+               <div style={{ padding: 16, borderTop: '1px solid #f0f0f0' }}>
+                 <Input.Search
+                   placeholder={t("kb.testPlaceholder")}
+                   value={query}
+                   onChange={(e) => setQuery(e.target.value)}
+                   onSearch={handleRecallTest}
+                   enterButton={<Button icon={<SearchOutlined />} type="primary" disabled={testing} />}
+                   loading={testing}
+                 />
+               </div>
+            </Card>
+          </Col>
 
-                         {/* System Response Bubble */}
-                         <div className="flex justify-start">
-                           <div
-                             className={`px-4 py-3 rounded-2xl rounded-tl-sm max-w-[90%] text-sm cursor-pointer border transition-all shadow-sm hover:shadow-md ${
-                               selectedTest?.id === test.id
-                               ? "bg-background border-primary ring-1 ring-primary"
-                               : "bg-background hover:bg-muted/50"
-                             }`}
-                             onClick={() => setSelectedTest(test)}
-                           >
-                             <div className="font-medium mb-1 flex items-center gap-2">
-                               <CheckCircle2 className="w-4 h-4 text-green-500" />
-                               {t("kb.testResults")} ({test.results?.length || 0})
-                             </div>
-                             <div className="text-xs text-muted-foreground">
-                               {new Date(test.created_at).toLocaleTimeString()}
-                             </div>
-                           </div>
-                         </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </ScrollArea>
-            </CardContent>
-            <div className="p-4 border-t bg-background">
-              <div className="flex gap-2">
-                <Input
-                  placeholder={t("kb.testPlaceholder")}
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleRecallTest()}
-                  disabled={testing}
-                  className="flex-1"
-                />
-                <Button onClick={handleRecallTest} disabled={testing}>
-                   {testing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                </Button>
-              </div>
-            </div>
-          </Card>
-
-          {/* Right Panel: Details */}
-          <Card className="flex-1 w-2/3 flex flex-col overflow-hidden">
-            <CardHeader className="pb-3 border-b bg-muted/5">
-              <CardTitle className="text-lg">{t("kb.testDetails")}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 overflow-auto p-0">
-              <ScrollArea className="h-full">
-                {selectedTest ? (
-                  <div className="p-6 space-y-6">
-                    <div className="space-y-2">
-                      <h3 className="text-sm font-medium text-muted-foreground">{t("kb.testQuery")}</h3>
-                      <div className="p-3 bg-muted rounded-md text-sm">{selectedTest.query}</div>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <h3 className="text-sm font-medium text-muted-foreground">{t("kb.testResults")}</h3>
-                      {selectedTest.results?.map((result: any, i: number) => (
-                        <Card key={i} className="border-l-4 border-l-primary shadow-sm">
-                          <CardContent className="p-4 space-y-3">
-                            <div className="flex justify-between items-start">
-                              <Badge variant="outline" className="font-mono">
-                                Score: {(result.score * 100).toFixed(1)}%
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                Chunk {result.chunk_index}
-                              </span>
+          {/* Results Panel */}
+          <Col span={16} style={{ height: '100%' }}>
+            <Card title={t("kb.testDetails")} style={{ height: '100%', display: 'flex', flexDirection: 'column' }} bodyStyle={{ flex: 1, overflowY: 'auto' }}>
+               {selectedTest ? (
+                 <Space direction="vertical" style={{ width: '100%' }} size="large">
+                   <div>
+                     <Text type="secondary">{t("kb.testQuery")}</Text>
+                     <div style={{ background: '#f5f5f5', padding: 12, borderRadius: 4, marginTop: 4 }}>
+                       {selectedTest.query}
+                     </div>
+                   </div>
+                   
+                   <div>
+                     <Text type="secondary">{t("kb.testResults")}</Text>
+                     {selectedTest.results?.map((result: any, i: number) => (
+                        <Card key={i} size="small" style={{ marginTop: 8, borderLeft: '4px solid #1890ff' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                            <Badge count={`Score: ${(result.score * 100).toFixed(1)}%`} style={{ backgroundColor: '#52c41a' }} />
+                            <Text type="secondary" style={{ fontSize: 12 }}>Chunk {result.chunk_index}</Text>
+                          </div>
+                          <Paragraph>
+                            {result.content}
+                          </Paragraph>
+                          {result.metadata && (
+                            <div style={{ background: '#fafafa', padding: 8, fontSize: 12, borderRadius: 4 }}>
+                              <pre style={{ margin: 0 }}>{JSON.stringify(result.metadata, null, 2)}</pre>
                             </div>
-                            <div className="text-sm leading-relaxed">
-                              {result.content}
-                            </div>
-                            {result.metadata && (
-                              <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                                {JSON.stringify(result.metadata, null, 2)}
-                              </div>
-                            )}
-                          </CardContent>
+                          )}
                         </Card>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
-                    <Search className="w-12 h-12 mb-4 opacity-20" />
-                    <p>{t("kb.testSelectPlaceholder")}</p>
-                  </div>
-                )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        </div>
+                     ))}
+                   </div>
+                 </Space>
+               ) : (
+                 testHistory.length > 0 ? <Empty description={t("kb.testSelectPlaceholder")} /> : null
+               )}
+            </Card>
+          </Col>
+        </Row>
       </div>
     );
   }
 
-  // Render Document List View
+  // Render List View
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">{t("kb.title")}</h1>
-        <LanguageToggle />
-      </div>
-
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={() => fetchDocuments(page)} disabled={loading}>
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-          {t("kb.refresh")}
-        </Button>
-        <div className="relative">
-          <Input
-            type="file"
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            onChange={handleUpload}
-            disabled={uploading}
-            accept=".txt,.pdf,.md,.docx,.xlsx,.pptx"
-          />
-          <Button disabled={uploading}>
-            <Upload className="w-4 h-4 mr-2" />
-            {uploading ? t("kb.uploading") : t("kb.upload")}
-          </Button>
-        </div>
-      </div>
-
-      {uploading && (
-        <div className="w-full space-y-1">
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{t("kb.uploadProgress")}</span>
-            <span>{uploadProgress}%</span>
-          </div>
-          <Progress value={uploadProgress} className="h-2" />
-        </div>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("kb.tabDocs")}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("kb.colFilename")}</TableHead>
-                <TableHead>{t("kb.headerIndexStatus")}</TableHead>
-                <TableHead>{t("kb.headerRagStatus")}</TableHead>
-                <TableHead>{t("kb.colDate")}</TableHead>
-                <TableHead className="text-right">{t("kb.colActions")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {documents.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                    {t("kb.noDocs")}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                documents.map((doc) => (
-                  <TableRow key={doc.id}>
-                    <TableCell className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-blue-500" />
-                      <div className="flex flex-col">
-                        <Button 
-                          variant="link" 
-                          className="p-0 h-auto font-medium justify-start text-foreground hover:text-primary"
-                          onClick={() => handlePreview(doc)}
-                        >
-                          {doc.filename}
-                        </Button>
-                        {doc.provider && (
-                          <span className="text-xs text-muted-foreground">{doc.provider}/{doc.model}</span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={
-                        doc.status === 'indexed' ? 'default' : 
-                        doc.status === 'processing' ? 'secondary' : 
-                        doc.status === 'failed' ? 'destructive' : 'outline'
-                      }>
-                        {doc.status === 'indexed' ? t("kb.statusIndexed") : 
-                         doc.status === 'processing' ? t("kb.statusProcessing") : 
-                         doc.status === 'failed' ? t("kb.statusFailed") :
-                         t("kb.statusIndexUnindexed")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                       <Badge variant={doc.is_configured ? 'default' : 'secondary'}>
-                         {doc.is_configured ? t("kb.statusConfigured") : t("kb.statusUnconfigured")}
-                       </Badge>
-                    </TableCell>
-                    <TableCell>{new Date(doc.created_at).toLocaleString()}</TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setIndexId(doc.id)}
-                        disabled={doc.status === 'processing' || doc.status === 'failed'}
-                      >
-                        <Database className="w-3 h-3 mr-1" />
-                        {t("kb.manualIndex")}
-                      </Button>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openConfig(doc)}
-                        disabled={doc.status !== 'indexed'}
-                      >
-                        <Settings className="w-3 h-3 mr-1" />
-                        {t("kb.actionConfig")}
-                      </Button>
-
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => openTest(doc)}
-                        disabled={!doc.is_configured || doc.status === 'failed'}
-                      >
-                        <Search className="w-3 h-3 mr-1" />
-                        {t("kb.actionTest")}
-                      </Button>
-
-                      <Button 
-                        variant="destructive" 
-                        size="icon" 
-                        className="h-8 w-8"
-                        onClick={() => setDeleteId(doc.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-
-          {/* Pagination */}
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious 
-                  onClick={() => page > 1 && fetchDocuments(page - 1)}
-                  className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                />
-              </PaginationItem>
-              
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                <PaginationItem key={p}>
-                  <PaginationLink 
-                    isActive={p === page}
-                    onClick={() => fetchDocuments(p)}
-                    className="cursor-pointer"
-                  >
-                    {p}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-
-              <PaginationItem>
-                <PaginationNext 
-                  onClick={() => page < totalPages && fetchDocuments(page + 1)}
-                  className={page >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                />
-              </PaginationItem>
-            </PaginationContent>
-          </Pagination>
-        </CardContent>
-      </Card>
-
-      {/* RAG Config Dialog */}
-      <Dialog open={configOpen} onOpenChange={setConfigOpen}>
-        <DialogContent className="sm:max-w-[600px]" onInteractOutside={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle>{t("kb.ragConfigTitle")} - {selectedDoc?.filename}</DialogTitle>
-            <DialogDescription>{t("kb.ragConfigDesc")}</DialogDescription>
-          </DialogHeader>
+    <div style={{ height: '100%', overflowY: 'auto', padding: 24 }}>
+      <div style={{ margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h1 style={{ fontSize: 24, fontWeight: 'bold', margin: 0 }}>{t("kb.title")}</h1>
           
-          <div className="space-y-6 py-4">
-            {ragConfig ? (
-              <>
-                <div className="space-y-2">
-                  <Label>{t("kb.retrievalMode")}</Label>
-                  <Select 
-                    value={ragConfig.retrieval_mode} 
-                    onValueChange={(val) => setRagConfig({...ragConfig, retrieval_mode: val})}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="vector">{t("kb.modeVector")}</SelectItem>
-                      <SelectItem value="full_text">{t("kb.modeKeyword")}</SelectItem>
-                      <SelectItem value="hybrid">{t("kb.modeHybrid")}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Input.Search
+              placeholder={t("kb.searchPlaceholder")}
+              onSearch={(val) => {
+                 setSearchQuery(val);
+                 setPagination({ ...pagination, current: 1 });
+                 fetchDocuments(1, val);
+              }}
+              style={{ width: 200 }}
+              allowClear
+            />
 
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>{t("kb.rerankEnabled")}</Label>
-                    <div className="text-sm text-muted-foreground">
-                      {t("kb.rerankDesc")}
-                    </div>
-                  </div>
-                  <Switch 
-                    checked={ragConfig.rerank_enabled}
-                    onCheckedChange={(checked) => setRagConfig({...ragConfig, rerank_enabled: checked})}
-                  />
-                </div>
+            <AntUpload
+              showUploadList={false}
+              beforeUpload={(file) => {
+                handleUpload(file);
+                return false; // Prevent auto upload
+              }}
+              accept=".txt,.pdf,.md,.docx,.xlsx,.pptx"
+            >
+              <Button icon={<UploadOutlined />} loading={uploading}>
+                {uploading ? t("kb.uploading") : t("kb.upload")}
+              </Button>
+            </AntUpload>
 
-                <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <Label>{t("kb.topK")}: {ragConfig.top_k}</Label>
-                  </div>
-                  <Slider 
-                    value={[ragConfig.top_k]} 
-                    min={1} 
-                    max={20} 
-                    step={1} 
-                    onValueChange={(vals) => setRagConfig({...ragConfig, top_k: vals[0]})}
-                  />
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <Label>{t("kb.scoreThreshold")}: {ragConfig.score_threshold}</Label>
-                  </div>
-                  <Slider 
-                    value={[ragConfig.score_threshold]} 
-                    min={0} 
-                    max={1} 
-                    step={0.05} 
-                    onValueChange={(vals) => setRagConfig({...ragConfig, score_threshold: vals[0]})}
-                  />
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-4">{t("common.loading")}</div>
-            )}
-          </div>
-
-          <DialogFooter>
-             <Button variant="outline" onClick={() => setConfigOpen(false)}>{t("kb.cancel")}</Button>
-             <Button onClick={saveConfig} disabled={savingConfig}>
-              <Save className="w-4 h-4 mr-2" />
-              {savingConfig ? "Saving..." : t("kb.saveConfig")}
+            <Button
+              onClick={() => fetchDocuments(pagination.current)}
+              disabled={loading}
+              icon={<ReloadOutlined spin={loading} />}
+            >
+              {t("kb.refresh")}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("kb.deleteConfirmTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("kb.deleteConfirmDesc")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("kb.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-red-500 hover:bg-red-600">
-              {t("kb.deleteConfirmTitle")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Index Dialog */}
-      <Dialog open={!!indexId} onOpenChange={(open) => !open && setIndexId(null)}>
-        <DialogContent onInteractOutside={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle>{t("kb.manualIndex")}</DialogTitle>
-            <DialogDescription>
-              {t("kb.indexDialogDesc")}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>{t("kb.provider")}</Label>
-              <Select value={indexProvider} onValueChange={setIndexProvider}>
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="openai">OpenAI</SelectItem>
-                  <SelectItem value="ollama">Ollama (Local)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>{t("kb.model")}</Label>
-              <Select value={indexModel} onValueChange={setIndexModel}>
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {indexProvider === 'openai' ? (
-                    <SelectItem value="text-embedding-3-small">text-embedding-3-small</SelectItem>
-                  ) : (
-                    <>
-                      {ollamaModels.length > 0 ? (
-                        ollamaModels.map((m) => (
-                          <SelectItem key={m} value={m}>{m}</SelectItem>
-                        ))
-                      ) : (
-                        <>
-                          <SelectItem value="nomic-embed-text">nomic-embed-text</SelectItem>
-                          <SelectItem value="mxbai-embed-large">mxbai-embed-large</SelectItem>
-                          <SelectItem value="bge-large">bge-large</SelectItem>
-                          <SelectItem value="llama3">llama3</SelectItem>
-                        </>
-                      )}
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
+            <LanguageToggle />
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIndexId(null)}>{t("kb.cancel")}</Button>
-            <Button onClick={confirmIndex} disabled={indexing}>
-              {indexing ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Database className="w-4 h-4 mr-2" />}
-              {t("kb.manualIndex")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      {/* Preview Dialog */}
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-7xl w-[95vw] h-[90vh] flex flex-col p-0 gap-0" onInteractOutside={(e) => e.preventDefault()}>
-          <DialogHeader className="px-6 py-4 border-b">
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-blue-500" />
-              {previewDoc?.filename}
-            </DialogTitle>
-            <DialogDescription>
-              {t("kb.previewDescription")}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-1 overflow-hidden bg-muted/5 relative">
-            {previewLoading ? (
-              <div className="h-full flex items-center justify-center">
-                <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : previewObjectUrl ? (
-               (() => {
-                const ext = previewDoc?.filename.split('.').pop()?.toLowerCase();
-                if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext || '')) {
-                  return (
-                    <div className="w-full h-full flex items-center justify-center overflow-auto p-4">
-                      <img src={previewObjectUrl} alt="Preview" className="max-w-full max-h-full object-contain shadow-sm" />
-                    </div>
-                  );
+        </div>
+
+        {uploading && (
+          <div style={{ marginBottom: 16 }}>
+             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#999', marginBottom: 4 }}>
+               <span>{t("kb.uploadProgress")}</span>
+               <span>{uploadProgress}%</span>
+             </div>
+             <Progress percent={uploadProgress} showInfo={false} size="small" />
+          </div>
+        )}
+
+        <Card title={t("kb.listTitle") || "Documents"}>
+          <AntUpload.Dragger
+            showUploadList={false}
+            beforeUpload={(file) => {
+              handleUpload(file);
+              return false;
+            }}
+            accept=".txt,.pdf,.md,.docx,.xlsx,.pptx"
+            openFileDialogOnClick={false}
+            style={{ padding: 0, border: 'none', background: 'transparent' }}
+          >
+            <Table
+              dataSource={documents}
+              columns={columns}
+              rowKey="id"
+              loading={loading}
+              pagination={{
+                ...pagination,
+                showSizeChanger: true,
+                showQuickJumper: true,
+                showTotal: (total) => `${t("kb.totalDocs")}: ${total}`,
+                onChange: (page, pageSize) => {
+                   setPagination({ ...pagination, current: page, pageSize: pageSize });
+                   fetchDocuments(page);
                 }
-                if (ext === 'pdf') {
-                  return (
-                    <iframe src={previewObjectUrl} className="w-full h-full border-none" title="PDF Preview" />
-                  );
-                }
-                if (['txt', 'md', 'json', 'log', 'csv'].includes(ext || '')) {
-                   return (
-                     <ScrollArea className="h-full w-full p-6">
-                       <pre className="whitespace-pre-wrap font-mono text-sm">{previewContent}</pre>
-                     </ScrollArea>
-                   );
-                }
-                // Fallback
-                return (
-                  <div className="h-full flex flex-col items-center justify-center gap-4">
-                    <div className="text-muted-foreground">
-                      Preview not supported for this file type
-                    </div>
-                    <Button variant="outline" asChild>
-                      <a href={previewObjectUrl} download={previewDoc?.filename}>
-                        Download File
-                      </a>
-                    </Button>
-                  </div>
-                );
-              })()
-            ) : (
-               <div className="h-full flex items-center justify-center text-muted-foreground">
-                 {t("kb.previewError")}
+              }}
+              locale={{ emptyText: t("kb.noDocs") }}
+            />
+          </AntUpload.Dragger>
+        </Card>
+      </div>
+
+      {/* RAG Config Modal */}
+      <Modal
+        title={t("kb.configTitle")}
+        open={configOpen}
+        onCancel={() => setConfigOpen(false)}
+        onOk={handleSaveConfig}
+        confirmLoading={savingConfig}
+        width={600}
+        maskClosable={false}
+      >
+        <Form
+          form={configForm}
+          layout="vertical"
+          initialValues={ragConfig || {}}
+        >
+          <Row gutter={16}>
+             <Col span={12}>
+               <Form.Item name="index_mode" label={t("kb.cfgIndexMode")}>
+                 <Select>
+                   <Option value="auto">Auto</Option>
+                   <Option value="manual">Manual</Option>
+                 </Select>
+               </Form.Item>
+             </Col>
+             <Col span={12}>
+               <Form.Item name="retrieval_mode" label={t("kb.cfgRetrievalMode")}>
+                 <Select>
+                   <Option value="vector">Vector</Option>
+                   <Option value="keyword">Keyword</Option>
+                   <Option value="hybrid">Hybrid</Option>
+                 </Select>
+               </Form.Item>
+             </Col>
+          </Row>
+
+          <Form.Item name="rerank_enabled" label={t("kb.cfgRerank")} valuePropName="checked">
+             <Switch />
+          </Form.Item>
+
+          <Form.Item 
+            noStyle
+            shouldUpdate={(prev, current) => prev.rerank_enabled !== current.rerank_enabled}
+          >
+            {({ getFieldValue }) => 
+              getFieldValue('rerank_enabled') && (
+                <Form.Item name="rerank_model" label={t("kb.cfgRerankModel")}>
+                   <Input />
+                </Form.Item>
+              )
+            }
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item noStyle shouldUpdate={(prev, curr) => prev.top_k !== curr.top_k}>
+                {({ getFieldValue }) => (
+                  <Form.Item name="top_k" label={`Top K: ${getFieldValue('top_k') || 5}`}>
+                    <Slider min={1} max={20} />
+                  </Form.Item>
+                )}
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item noStyle shouldUpdate={(prev, curr) => prev.score_threshold !== curr.score_threshold}>
+                {({ getFieldValue }) => (
+                  <Form.Item name="score_threshold" label={`Threshold: ${getFieldValue('score_threshold') || 0.6}`}>
+                    <Slider min={0} max={1} step={0.01} />
+                  </Form.Item>
+                )}
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
+
+      {/* Index Modal */}
+      <Modal
+        title={t("kb.indexTitle")}
+        open={indexModalOpen}
+        onCancel={() => setIndexModalOpen(false)}
+        onOk={handleIndex}
+        confirmLoading={indexing}
+        maskClosable={false}
+        okText={t("common.confirm")}
+        cancelText={t("common.cancel")}
+      >
+        <Form form={indexForm} layout="vertical">
+          <Form.Item name="provider" label={t("kb.indexProvider")} rules={[{ required: true }]}>
+            <Select onChange={handleIndexProviderChange} showSearch allowClear>
+              {Object.entries(embeddingModelsConfig).map(([key, value]) => (
+                <Option key={key} value={key}>{value.name}</Option>
+              ))}
+            </Select>
+          </Form.Item>
+          
+          <Form.Item 
+            noStyle
+            shouldUpdate={(prev, current) => prev.provider !== current.provider}
+          >
+            {({ getFieldValue }) => {
+               const provider = getFieldValue('provider');
+               if (!provider) return null;
+
+               const config = (embeddingModelsConfig as any)[provider];
+               
+               return (
+                 <Form.Item name="model" label={t("kb.indexModel")} rules={[{ required: true }]}>
+                   {provider === 'ollama' ? (
+                     <Select showSearch allowClear placeholder="Select Ollama embedding model">
+                       {ollamaModels.map(m => <Option key={m} value={m}>{m}</Option>)}
+                     </Select>
+                   ) : (
+                     <Select showSearch allowClear placeholder="Select embedding model">
+                       {config?.models.map((m: any) => (
+                         <Option key={m.id} value={m.id}>
+                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                             <span>{m.id}</span>
+                             <span style={{ fontSize: 11, color: '#999' }}>Dim: {m.dimension}</span>
+                           </div>
+                           <div style={{ fontSize: 10, color: '#999', marginTop: -4 }}>{m.description}</div>
+                         </Option>
+                       ))}
+                     </Select>
+                   )}
+                 </Form.Item>
+               );
+            }}
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Preview Modal - Large size */}
+      <Modal
+        title={`${t("kb.preview")}: ${previewDoc?.filename}`}
+        open={previewOpen}
+        onCancel={() => setPreviewOpen(false)}
+        footer={null}
+        width="66vw"
+        style={{ top: 20 }}
+        styles={{ body: { height: '85vh', padding: 0, overflow: 'hidden' } }}
+        maskClosable={false}
+      >
+        <div style={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column' }}>
+           {previewLoading ? (
+             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+               <Spin size="large" tip="Loading..." />
+             </div>
+           ) : previewObjectUrl ? (
+             previewDoc?.filename.toLowerCase().endsWith('.pdf') ? (
+               <iframe 
+                 src={previewObjectUrl} 
+                 style={{ width: '100%', height: '100%', border: 'none' }} 
+                 title="PDF Preview"
+               />
+             ) : (['jpg', 'jpeg', 'png', 'gif', 'webp'].some(ext => previewDoc?.filename.toLowerCase().endsWith('.' + ext))) ? (
+                <div style={{ height: '100%', overflow: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f0f0' }}>
+                   <img src={previewObjectUrl} alt="Preview" style={{ maxWidth: '100%', maxHeight: '100%' }} />
+                </div>
+             ) : (
+               <div style={{ padding: 20, height: '100%', overflow: 'auto', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                 {previewContent || "Preview not available for this file type."}
                </div>
-            )}
-          </div>
-          <DialogFooter className="px-6 py-4 border-t">
-            <Button onClick={() => setPreviewOpen(false)}>{t("kb.close")}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+             )
+           ) : (
+             <div style={{ padding: 20 }}>
+               {previewContent}
+             </div>
+           )}
+        </div>
+      </Modal>
     </div>
   );
 }

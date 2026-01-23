@@ -1,5 +1,3 @@
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import SessionExpiredHandler from "@/components/SessionExpiredHandler";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
@@ -13,6 +11,7 @@ import BatchEval from "./pages/BatchEval";
 import Layout from "@/components/Layout";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
+import { App as AntdApp } from "antd";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType<any> }) {
   const [, setLocation] = useLocation();
@@ -70,11 +69,10 @@ function App() {
         defaultTheme="light"
         switchable
       >
-        <TooltipProvider>
-          <Toaster />
+        <AntdApp>
           <SessionExpiredHandler />
           <Router />
-        </TooltipProvider>
+        </AntdApp>
       </ThemeProvider>
     </ErrorBoundary>
   );

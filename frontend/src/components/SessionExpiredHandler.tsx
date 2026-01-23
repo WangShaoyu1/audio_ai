@@ -1,13 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { Modal } from "antd";
 import { useLocation } from "wouter";
 
 export default function SessionExpiredHandler() {
@@ -33,18 +25,17 @@ export default function SessionExpiredHandler() {
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>登录已过期</AlertDialogTitle>
-          <AlertDialogDescription>
-            您的登录会话已过期，请重新登录以继续使用。
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogAction onClick={handleLogin}>重新登录</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <Modal
+      title="登录已过期"
+      open={open}
+      onOk={handleLogin}
+      closable={false}
+      maskClosable={false}
+      cancelButtonProps={{ style: { display: 'none' } }}
+      okText="重新登录"
+      centered
+    >
+      <p>您的登录会话已过期，请重新登录以继续使用。</p>
+    </Modal>
   );
 }

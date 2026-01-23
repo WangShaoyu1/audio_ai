@@ -1,20 +1,19 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
-import { Upload, FileSpreadsheet, Download } from "lucide-react";
+import { Button, Card, Upload, message, Typography, theme } from "antd";
+import { DownloadOutlined, InboxOutlined } from "@ant-design/icons";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import type { UploadProps } from 'antd';
+
+const { Dragger } = Upload;
+const { Title, Text } = Typography;
 
 export default function BatchEval() {
   const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
+  const { token } = theme.useToken();
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const handleUpload = async (file: File) => {
     setUploading(true);
     const formData = new FormData();
     formData.append("file", file);
@@ -42,75 +41,67 @@ export default function BatchEval() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      toast.success(t("batchEval.success"));
+      message.success(t("batchEval.success"));
     } catch (error) {
-      toast.error(t("batchEval.error"));
+      message.error(t("batchEval.error"));
     } finally {
       setUploading(false);
-      e.target.value = "";
     }
   };
 
+  const uploadProps: UploadProps = {
+    name: 'file',
+    multiple: false,
+    showUploadList: false,
+    accept: ".xlsx",
+    customRequest: ({ file }) => {
+      handleUpload(file as File);
+    },
+  };
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">{t("batchEval.title")}</h1>
+    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Title level={2} style={{ margin: 0 }}>{t("batchEval.title")}</Title>
         <LanguageToggle />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("batchEval.runTitle")}</CardTitle>
-          <CardDescription>
-            {t("batchEval.runDesc")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="border-2 border-dashed border-white/10 rounded-lg p-12 text-center space-y-4">
-            <div className="flex justify-center">
-              <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center">
-                <FileSpreadsheet className="w-8 h-8 text-blue-400" />
-              </div>
-            </div>
-            <div>
-              <h3 className="text-lg font-medium">{t("batchEval.uploadTitle")}</h3>
-              <p className="text-sm text-muted-foreground mt-1">
+      <Card title={t("batchEval.runTitle")}>
+        <div style={{ marginBottom: 24 }}>
+          <Text type="secondary">{t("batchEval.runDesc")}</Text>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+          <div style={{ textAlign: 'center' }}>
+            <Dragger {...uploadProps} disabled={uploading} style={{ padding: 48, background: token.colorFillAlter, border: `1px dashed ${token.colorBorder}` }}>
+              <p className="ant-upload-drag-icon">
+                <InboxOutlined style={{ color: token.colorPrimary }} />
+              </p>
+              <p className="ant-upload-text">{t("batchEval.uploadTitle")}</p>
+              <p className="ant-upload-hint">
                 {t("batchEval.uploadFormat")}
               </p>
-              <Button variant="link" className="text-sm h-auto p-0 mt-2" onClick={() => window.open("/api/v1/templates/batch-eval", "_blank")}>
-                <Download className="w-3 h-3 mr-1" />
+            </Dragger>
+
+            <div style={{ marginTop: 16 }}>
+               <Button type="link" icon={<DownloadOutlined />} onClick={() => window.open("/api/v1/templates/batch-eval", "_blank")}>
                 {t("batchEval.downloadTemplate")}
               </Button>
             </div>
-            <div className="flex justify-center">
-              <div className="relative">
-                <Input
-                  type="file"
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  onChange={handleUpload}
-                  disabled={uploading}
-                  accept=".xlsx"
-                />
-                <Button disabled={uploading}>
-                  <Upload className="w-4 h-4 mr-2" />
-                  {uploading ? t("batchEval.processing") : t("batchEval.selectFile")}
-                </Button>
-              </div>
-            </div>
           </div>
 
-          <div className="bg-muted p-4 rounded-lg">
-            <h4 className="font-medium mb-2">{t("batchEval.templateFormat")}</h4>
-            <p className="text-sm text-muted-foreground mb-2">
+          <div style={{ background: token.colorFillTertiary, padding: 16, borderRadius: token.borderRadius }}>
+            <Title level={5} style={{ marginTop: 0 }}>{t("batchEval.templateFormat")}</Title>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
               {t("batchEval.templateDesc")}
-            </p>
-            <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-              <li><strong>query</strong>: {t("batchEval.colQuery")}</li>
-              <li><strong>expected_intent</strong>: {t("batchEval.colIntent")}</li>
-              <li><strong>expected_slots</strong>: {t("batchEval.colSlots")}</li>
+            </Text>
+            <ul style={{ paddingLeft: 20, margin: 0, color: token.colorTextSecondary }}>
+              <li><Text strong>query</Text>: {t("batchEval.colQuery")}</li>
+              <li><Text strong>expected_intent</Text>: {t("batchEval.colIntent")}</li>
+              <li><Text strong>expected_slots</Text>: {t("batchEval.colSlots")}</li>
             </ul>
           </div>
-        </CardContent>
+        </div>
       </Card>
     </div>
   );

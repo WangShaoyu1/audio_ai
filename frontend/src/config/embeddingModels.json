@@ -1,0 +1,60 @@
+{
+  "openai": {
+    "name": "OpenAI",
+    "models": [
+      { "id": "text-embedding-3-small", "dimension": 1536, "description": "High efficiency, standard performance" },
+      { "id": "text-embedding-3-large", "dimension": 3072, "description": "High precision, larger vector" },
+      { "id": "text-embedding-ada-002", "dimension": 1536, "description": "Legacy standard" }
+    ]
+  },
+  "azure": {
+    "name": "Azure OpenAI",
+    "models": [
+      { "id": "text-embedding-3-small", "dimension": 1536, "description": "Azure hosted" },
+      { "id": "text-embedding-3-large", "dimension": 3072, "description": "Azure hosted" },
+      { "id": "text-embedding-ada-002", "dimension": 1536, "description": "Azure hosted" }
+    ]
+  },
+  "qwen": {
+    "name": "Qwen (DashScope)",
+    "models": [
+      { "id": "text-embedding-v1", "dimension": 1536, "description": "General purpose Chinese/English" },
+      { "id": "text-embedding-v2", "dimension": 1536, "description": "Improved performance" }
+    ]
+  },
+  "zhipu": {
+    "name": "Zhipu AI (GLM)",
+    "models": [
+      { "id": "embedding-2", "dimension": 1024, "description": "General purpose" },
+      { "id": "embedding-3", "dimension": 2048, "description": "Latest generation" }
+    ]
+  },
+  "qianfan": {
+    "name": "Baidu Qianfan",
+    "models": [
+      { "id": "Embedding-V1", "dimension": 384, "description": "Basic embedding" },
+      { "id": "bge-large-zh", "dimension": 1024, "description": "Optimized for Chinese" },
+      { "id": "bge-large-en", "dimension": 1024, "description": "Optimized for English" },
+      { "id": "tao-8k", "dimension": 1024, "description": "Long context support" }
+    ]
+  },
+  "minimax": {
+    "name": "Minimax",
+    "models": [
+      { "id": "embo-01", "dimension": 1536, "description": "General purpose" }
+    ]
+  },
+  "google": {
+    "name": "Google Gemini",
+    "models": [
+      { "id": "embedding-001", "dimension": 768, "description": "Gecko model" }
+    ]
+  },
+  "ollama": {
+    "name": "Ollama (Local)",
+    "models": [],
+    "known_embedding_models": [
+      "nomic-embed-text", "mxbai-embed-large", "snowflake-arctic-embed", "all-minilm", "bge-m3","bge-large"
+    ]
+  }
+}

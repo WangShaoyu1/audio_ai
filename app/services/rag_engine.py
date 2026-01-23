@@ -48,6 +48,42 @@ class RAGEngine:
         chinese_count = len([c for c in text if '\u4e00' <= c <= '\u9fff'])
         return 'zh' if (chinese_count / len(text)) > 0.05 else 'en'
 
+    async def _get_active_models(self, user_id: uuid.UUID, doc_ids: List[uuid.UUID] = None) -> List[Dict[str, str]]:
+        """
+        Identify distinct (provider, model) pairs used in the user's documents.
+        """
+        stmt = select(Document.provider, Document.model).filter(Document.user_id == user_id)
+        
+        if doc_ids:
+            stmt = stmt.filter(Document.id.in_(doc_ids))
+            
+        stmt = stmt.group_by(Document.provider, Document.model)
+        result = await self.db.execute(stmt)
+        rows = result.all()
+        
+        models = []
+        for r in rows:
+            provider = r[0]
+            model = r[1]
+            # Handle legacy data or missing config -> use defaults
+            if not provider:
+                provider = settings.EMBEDDING_PROVIDER
+            if not model:
+                model = settings.EMBEDDING_MODEL
+            
+            models.append({"provider": provider, "model": model})
+            
+        # Deduplicate
+        unique_models = []
+        seen = set()
+        for m in models:
+            key = (m["provider"], m["model"])
+            if key not in seen:
+                seen.add(key)
+                unique_models.append(m)
+                
+        return unique_models
+
     async def search(self, query: str, user_id: uuid.UUID, top_k: int = 3, doc_ids: List[uuid.UUID] = None) -> List[Any]:
         if not settings.RAG_ENABLE:
             return []
@@ -61,24 +97,115 @@ class RAGEngine:
             vector_results = []
             keyword_results = []
             
-            # 2. Vector Search
+            # 2. Vector Search (Multi-Path)
             if config.retrieval_mode in ["vector", "hybrid"]:
-                # Use global default for query embedding (or should we use config?)
-                # Assuming query uses global config for now unless we store per-user embedding config
-                query_embedding = await vector_service.embed_query(query)
-                stmt = select(DocumentChunk).join(Document).filter(
-                    Document.user_id == user_id
-                )
+                # Identify which embedding models are needed
+                active_models = await self._get_active_models(user_id, doc_ids)
                 
-                if doc_ids:
-                    stmt = stmt.filter(Document.id.in_(doc_ids))
+                if not active_models:
+                    # No documents or no models found?
+                    # Fallback to default just in case
+                    active_models = [{"provider": settings.EMBEDDING_PROVIDER, "model": settings.EMBEDDING_MODEL}]
+
+                import asyncio
                 
-                stmt = stmt.order_by(
-                    DocumentChunk.embedding.cosine_distance(query_embedding)
-                ).limit(effective_top_k * 2) 
+                # Helper for parallel execution
+                async def fetch_results_for_model(model_config):
+                    provider = model_config["provider"]
+                    model = model_config["model"]
+                    
+                    try:
+                        # a. Generate Query Embedding for this specific model
+                        query_embedding = await vector_service.embed_query(query, provider=provider, model=model)
+                        
+                        # b. Search only documents that match this provider/model
+                        stmt = select(DocumentChunk).join(Document).filter(
+                            Document.user_id == user_id
+                        )
+                        
+                        # Handle Null/Default matching logic if needed, 
+                        # but for now assuming data is clean or we rely on exact match.
+                        # For legacy data where provider is NULL, we might miss it if we strictly filter.
+                        # Let's assume _get_active_models handled the defaults logic for identification,
+                        # but for querying we need to match what's in DB.
+                        # If DB has NULL, we should query where provider IS NULL.
+                        # But vector_service.embed_query needs explicit provider.
+                        # Complex: If DB has NULL, we assume it used Default settings. 
+                        # So if model_config == Default, we search (provider==Default OR provider IS NULL).
+                        
+                        # Simplified Logic:
+                        # We search based on what we found in DB.
+                        # If we found (None, None) in DB, we use Default for embedding, 
+                        # and search for (provider IS NULL OR provider='')
+                        
+                        filters = []
+                        if doc_ids:
+                            filters.append(Document.id.in_(doc_ids))
+                            
+                        # Provider Filter
+                        if provider == settings.EMBEDDING_PROVIDER:
+                            # Match explicit OR null/empty (legacy compatibility)
+                            filters.append((Document.provider == provider) | (Document.provider == None) | (Document.provider == ''))
+                        else:
+                            filters.append(Document.provider == provider)
+                            
+                        # Model Filter
+                        if model == settings.EMBEDDING_MODEL:
+                             filters.append((Document.model == model) | (Document.model == None) | (Document.model == ''))
+                        else:
+                            filters.append(Document.model == model)
+                            
+                        stmt = stmt.filter(*filters)
+                        
+                        stmt = stmt.order_by(
+                            DocumentChunk.embedding.cosine_distance(query_embedding)
+                        ).limit(effective_top_k * 2) 
+                        
+                        res = await self.db.execute(stmt)
+                        return res.scalars().all()
+                        
+                    except Exception as ex:
+                        logger.error(f"Search failed for model {provider}/{model}: {ex}")
+                        # Re-raise to let the caller know search failed due to error, not just empty
+                        raise ex
+
+                # Execute all model searches in parallel
+                tasks = [fetch_results_for_model(m) for m in active_models]
+                # return_exceptions=True so we can check if any failed
+                results_list_or_errors = await asyncio.gather(*tasks, return_exceptions=True)
                 
-                vec_result = await self.db.execute(stmt)
-                vector_results = vec_result.scalars().all()
+                # Check for errors
+                results_list = []
+                for res in results_list_or_errors:
+                    if isinstance(res, Exception):
+                        logger.error(f"One of the search tasks failed: {res}")
+                        # If all fail, we might want to raise. If partial fail, maybe continue?
+                        # For now, if any fails, it might indicate service issue. 
+                        # But let's be robust: continue with successes.
+                        continue
+                    results_list.append(res)
+                
+                if not results_list and results_list_or_errors:
+                     # All failed
+                     if all(isinstance(x, Exception) for x in results_list_or_errors):
+                         raise Exception(f"All embedding models failed. Last error: {results_list_or_errors[0]}")
+
+                # Merge Multi-Model Results using RRF (Reciprocal Rank Fusion)
+                # This ensures top results from different models are treated equally
+                temp_scores = {}
+                for model_results in results_list:
+                    for rank, item in enumerate(model_results):
+                        if item.id not in temp_scores:
+                            temp_scores[item.id] = {"item": item, "score": 0}
+                        # Standard RRF constant k=60
+                        temp_scores[item.id]["score"] += 1 / (rank + 60)
+                
+                # Sort by score to get the final ranked vector results
+                sorted_vector_results = sorted(temp_scores.values(), key=lambda x: x["score"], reverse=True)
+                vector_results = [x["item"] for x in sorted_vector_results]
+
+            # 3. Keyword Search (Full Text)
+
 
             # 3. Keyword Search (Full Text)
             if config.retrieval_mode in ["keyword", "hybrid", "full_text"]:
@@ -110,26 +237,27 @@ class RAGEngine:
             # 4. Rerank (Reciprocal Rank Fusion)
             final_chunks = self._rerank(vector_results, keyword_results, effective_top_k, config.rerank_enabled)
             
-            # Return full chunk objects or structured data? 
-            # Original returned List[str], but UI needs metadata.
-            # Let's return List[Dict] with content and metadata
-            return [
-                {
+            # Return structured data
+            formatted_results = []
+            for chunk in final_chunks:
+                # Ensure score is float
+                score = getattr(chunk, "score", 0.0)
+                formatted_results.append({
+                    "id": str(chunk.id),
+                    "doc_id": str(chunk.doc_id),
                     "content": chunk.content,
-                    "score": getattr(chunk, "score", None), # Score might be attached by reranker logic if modified, but RRF is abstract
+                    "score": float(score),
                     "metadata": {
-                        "chunk_id": str(chunk.id),
-                        "doc_id": str(chunk.doc_id),
-                        # Need to fetch filename? N+1 issue if not joined.
-                        # For now, let's keep it simple.
+                        "chunk_index": chunk.chunk_index
                     }
-                } 
-                for chunk in final_chunks
-            ]
+                })
+            
+            return formatted_results
             
         except Exception as e:
             logger.error(f"RAG Search Error: {e}")
-            return []
+            # Re-raise to let the API handle it
+            raise e
 
     def _rerank(self, vector_results: List[DocumentChunk], keyword_results: List[DocumentChunk], k: int, enabled: bool) -> List[DocumentChunk]:
         """
@@ -188,27 +316,61 @@ class RAGEngine:
         """
         logger.info(f"Starting indexing for doc_id: {doc_id} with {provider}/{model}")
         try:
-            chunks = self.text_splitter.split_text(content)
+            # Determine chunk size based on model
+            # Some models like bge-large have smaller context windows (e.g. 512 tokens)
+            # 1000 chars might exceed 512 tokens for Chinese
+            chunk_size = settings.RAG_CHUNK_SIZE
+            if model and ("bge" in model.lower() or "bert" in model.lower()):
+                 chunk_size = 500
+                 logger.info(f"Adjusting chunk_size to {chunk_size} for model {model}")
+
+            splitter = RecursiveCharacterTextSplitter(
+                chunk_size=chunk_size,
+                chunk_overlap=settings.RAG_CHUNK_OVERLAP,
+                length_function=len,
+            )
+            
+            chunks = splitter.split_text(content)
             logger.info(f"Split content into {len(chunks)} chunks")
             
-            # Batch embedding could be better here, but let's loop for now or use embed_documents
+                # Batch embedding: Split chunks into smaller batches to avoid overloading Ollama or hitting timeouts
             if chunks:
-                embeddings = await vector_service.embed_documents(chunks, provider=provider, model=model)
+                # Use a safe batch size
+                batch_size = 10
+                total_chunks = len(chunks)
                 
-                for idx, (text, embedding) in enumerate(zip(chunks, embeddings)):
-                    if not text.strip():
-                        continue
+                for i in range(0, total_chunks, batch_size):
+                    batch_chunks = chunks[i:i + batch_size]
+                    logger.info(f"Processing batch {i//batch_size + 1}/{(total_chunks-1)//batch_size + 1} with {len(batch_chunks)} chunks")
                     
-                    chunk = DocumentChunk(
-                        doc_id=doc_id,
-                        content=text,
-                        chunk_index=idx,
-                        embedding=embedding
-                    )
-                    self.db.add(chunk)
+                    try:
+                        batch_embeddings = await vector_service.embed_documents(batch_chunks, provider=provider, model=model)
+                        
+                        # Create and add chunks for this batch
+                        for j, (text, embedding) in enumerate(zip(batch_chunks, batch_embeddings)):
+                            if not text.strip():
+                                continue
+                            
+                            # Ensure embedding is a list of floats
+                            if hasattr(embedding, 'tolist'):
+                                embedding = embedding.tolist()
+                            
+                            chunk = DocumentChunk(
+                                doc_id=doc_id,
+                                content=text,
+                                chunk_index=i + j, # Global index
+                                embedding=embedding
+                            )
+                            self.db.add(chunk)
+                        
+                        # Commit after each batch
+                        await self.db.commit()
+                        
+                    except Exception as e:
+                        logger.error(f"Batch embedding/saving failed for batch starting at index {i}: {e}")
+                        await self.db.rollback()
+                        raise e
             
-            logger.info("Committing chunks to database")
-            await self.db.commit()
             logger.info("Indexing completed successfully")
         except Exception as e:
             logger.error(f"Indexing Error: {e}")

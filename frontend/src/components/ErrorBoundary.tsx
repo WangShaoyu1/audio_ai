@@ -1,7 +1,9 @@
-import { cn } from "@/lib/utils";
-import { AlertTriangle, RotateCcw } from "lucide-react";
+import { Button, Result, Typography, Card } from "antd";
+import { ReloadOutlined } from "@ant-design/icons";
 import { Component, ReactNode } from "react";
 import { withTranslation, WithTranslation } from "react-i18next";
+
+const { Paragraph, Text } = Typography;
 
 interface Props extends WithTranslation {
   children: ReactNode;
@@ -27,33 +29,35 @@ class ErrorBoundary extends Component<Props, State> {
 
     if (this.state.hasError) {
       return (
-        <div className="flex items-center justify-center min-h-screen p-8 bg-background">
-          <div className="flex flex-col items-center w-full max-w-2xl p-8">
-            <AlertTriangle
-              size={48}
-              className="text-destructive mb-6 flex-shrink-0"
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f5f5f5', padding: 24 }}>
+          <Card style={{ width: '100%', maxWidth: 800, boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+            <Result
+              status="error"
+              title={t("error.unexpected")}
+              subTitle={
+                <div style={{ textAlign: 'left', marginTop: 24 }}>
+                  <Paragraph>
+                    <Text type="secondary">{t("error.unexpected")}</Text>
+                  </Paragraph>
+                  <div style={{ background: '#f0f0f0', padding: 16, borderRadius: 8, maxHeight: 400, overflow: 'auto' }}>
+                    <pre style={{ margin: 0, fontSize: 12, fontFamily: 'monospace' }}>
+                      {this.state.error?.stack}
+                    </pre>
+                  </div>
+                </div>
+              }
+              extra={[
+                <Button
+                  type="primary"
+                  key="console"
+                  onClick={() => window.location.reload()}
+                  icon={<ReloadOutlined />}
+                >
+                  {t("error.reload")}
+                </Button>,
+              ]}
             />
-
-            <h2 className="text-xl mb-4">{t("error.unexpected")}</h2>
-
-            <div className="p-4 w-full rounded bg-muted overflow-auto mb-6">
-              <pre className="text-sm text-muted-foreground whitespace-break-spaces">
-                {this.state.error?.stack}
-              </pre>
-            </div>
-
-            <button
-              onClick={() => window.location.reload()}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg",
-                "bg-primary text-primary-foreground",
-                "hover:opacity-90 cursor-pointer"
-              )}
-            >
-              <RotateCcw size={16} />
-              {t("error.reload")}
-            </button>
-          </div>
+          </Card>
         </div>
       );
     }

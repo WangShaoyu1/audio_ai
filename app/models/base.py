@@ -8,7 +8,7 @@ from datetime import datetime
 # Define common types for PostgreSQL
 UUID_TYPE = PG_UUID(as_uuid=True)
 JSON_TYPE = JSONB
-VECTOR_TYPE = Vector(1536)
+VECTOR_TYPE = Vector() # Flexible dimension
 
 Base = declarative_base()
 

@@ -1,12 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Globe } from "lucide-react";
+import { Button, Dropdown, MenuProps } from "antd";
+import { GlobalOutlined } from "@ant-design/icons";
 
 export function LanguageToggle() {
   const { i18n } = useTranslation();
@@ -20,25 +14,16 @@ export function LanguageToggle() {
     { code: "ko", label: "한국어" },
   ];
 
+  const items: MenuProps['items'] = languages.map((lang) => ({
+    key: lang.code,
+    label: lang.label,
+    onClick: () => i18n.changeLanguage(lang.code),
+    style: i18n.language === lang.code ? { backgroundColor: 'rgba(0, 0, 0, 0.04)' } : undefined
+  }));
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-9 w-9">
-          <Globe className="h-[1.2rem] w-[1.2rem]" />
-          <span className="sr-only">Toggle language</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {languages.map((lang) => (
-          <DropdownMenuItem
-            key={lang.code}
-            onClick={() => i18n.changeLanguage(lang.code)}
-            className={i18n.language === lang.code ? "bg-accent" : ""}
-          >
-            {lang.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Dropdown menu={{ items }} placement="bottomRight" arrow>
+      <Button type="text" icon={<GlobalOutlined />} />
+    </Dropdown>
   );
 }

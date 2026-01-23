@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, desc, and_
 from app.models.base import User, Session, Message
 from app.core.config import settings
+from app.core.redis import RedisClient
 import logging
 import random
 from app.services.vector_service import vector_service
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 class MemoryManager:
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.redis = redis.from_url(f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}")
+        self.redis = RedisClient.get_instance()
         
     async def get_short_term_memory(self, session_id: str) -> List[Dict]:
         """获取短期记忆 (Redis)"""
@@ -83,13 +84,14 @@ class MemoryManager:
 
         try:
             # 1. Save to Redis (Short-term)
-            key = f"session:{session_id}:history"
-            message_data = {"role": role, "content": content, "metadata": metadata}
-            async with self.redis.pipeline() as pipe:
-                await pipe.lpush(key, json.dumps(message_data))
-                await pipe.ltrim(key, 0, settings.SHORT_TERM_MEMORY_MAX_SIZE - 1)
-                await pipe.expire(key, settings.SHORT_TERM_MEMORY_TTL_SECONDS)
-                await pipe.execute()
+            if settings.SHORT_TERM_MEMORY_ENABLE:
+                key = f"session:{session_id}:history"
+                message_data = {"role": role, "content": content, "metadata": metadata}
+                async with self.redis.pipeline() as pipe:
+                    await pipe.lpush(key, json.dumps(message_data))
+                    await pipe.ltrim(key, 0, settings.SHORT_TERM_MEMORY_MAX_SIZE - 1)
+                    await pipe.expire(key, settings.SHORT_TERM_MEMORY_TTL_SECONDS)
+                    await pipe.execute()
 
             # 2. Save to DB (Mid-term)
             # Calculate embedding if enabled

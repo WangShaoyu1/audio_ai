@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query,BackgroundTasks
 from fastapi.responses import StreamingResponse, FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import delete, desc, func
-from app.db.session import get_db
+from app.db.session import get_db, AsyncSessionLocal
 from app.services.instruction_service import InstructionService
 from app.services.eval_service import EvalService
 from app.services.instruction_import_service import InstructionImportService
@@ -134,7 +134,17 @@ class RetrieveRequest(BaseModel):
     doc_id: Optional[uuid.UUID] = None
     top_k: Optional[int] = 3
 
-@router.post("/admin/rag/retrieve")
+class RetrieveResultItem(BaseModel):
+    id: uuid.UUID
+    doc_id: uuid.UUID
+    content: str
+    score: float
+    metadata: Dict[str, Any]
+
+class RetrieveResponse(BaseModel):
+    results: List[RetrieveResultItem]
+
+@router.post("/admin/rag/retrieve", response_model=RetrieveResponse)
 async def retrieve_test(
     request: RetrieveRequest,
     db: AsyncSession = Depends(get_db),
@@ -151,14 +161,23 @@ async def retrieve_test(
     await db.commit()
     
     doc_ids = [request.doc_id] if request.doc_id else None
-    results = await rag.search(
-        query=request.query, 
-        user_id=current_user.id, 
-        top_k=request.top_k or 3, 
-        doc_ids=doc_ids
-    )
     
-    # Update record with results (simplified for now, storing count)
+    try:
+        results = await rag.search(
+            query=request.query, 
+            user_id=current_user.id, 
+            top_k=request.top_k or 3, 
+            doc_ids=doc_ids
+        )
+    except Exception as e:
+        # Update record with error
+        record.results = {"error": str(e)}
+        await db.commit()
+        raise HTTPException(status_code=500, detail=f"RAG Search failed: {str(e)}")
+    
+    # Update record with results
+    # results is List[Dict], compatible with JSON
+    record.results = results
     record.result_count = len(results)
     await db.commit()
     
@@ -183,10 +202,67 @@ class IndexRequest(BaseModel):
     provider: str
     model: str
 
+
+async def background_index_document(doc_id: uuid.UUID, provider: str, model: str):
+    """
+    Background task for indexing documents.
+    """
+    async with AsyncSessionLocal() as session:
+        try:
+            logger.info(f"Background indexing started for doc_id: {doc_id}")
+            
+            # 1. Fetch Document
+            stmt = select(Document).where(Document.id == doc_id)
+            result = await session.execute(stmt)
+            doc = result.scalar_one_or_none()
+            
+            if not doc:
+                logger.error(f"Document {doc_id} not found in background task")
+                return
+
+            rag = RAGEngine(session)
+            
+            # 2. Clear existing chunks
+            # We execute delete but don't commit yet. 
+            # It will be committed together with new chunks in rag.index_document
+            await session.execute(delete(DocumentChunk).where(DocumentChunk.doc_id == doc_id))
+            
+            # 3. Index Document (Generates embeddings and commits)
+            # Note: rag.index_document commits the transaction!
+            await rag.index_document(doc_id, doc.content, provider=provider, model=model)
+            
+            # 4. Update Status (New Transaction)
+            # Since expire_on_commit=False, 'doc' object is still valid but detached/clean.
+            # We can modify it and commit.
+            doc.status = "indexed"
+            doc.is_configured = True
+            doc.provider = provider
+            doc.model = model
+            doc.error_msg = None 
+            await session.commit()
+            logger.info(f"Background indexing finished for doc_id: {doc_id}")
+            
+        except Exception as e:
+            logger.error(f"Background indexing failed for doc_id {doc_id}: {e}", exc_info=True)
+            await session.rollback()
+            
+            # Re-fetch document to update status (in case of session issues)
+            try:
+                stmt = select(Document).where(Document.id == doc_id)
+                result = await session.execute(stmt)
+                doc = result.scalar_one_or_none()
+                if doc:
+                    doc.status = "failed"
+                    doc.error_msg = str(e)
+                    await session.commit()
+            except Exception as ex:
+                logger.error(f"Failed to update error status for doc_id {doc_id}: {ex}")
+
 @router.post("/admin/documents/{doc_id}/index")
 async def index_document_endpoint(
     doc_id: uuid.UUID,
     request: IndexRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -197,26 +273,14 @@ async def index_document_endpoint(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
         
+    # Set status to processing immediately
     doc.status = "processing"
     await db.commit()
     
-    rag = RAGEngine(db)
-    try:
-        # Clear existing chunks
-        await db.execute(delete(DocumentChunk).where(DocumentChunk.doc_id == doc_id))
-        
-        await rag.index_document(doc_id, doc.content, provider=request.provider, model=request.model)
-        doc.status = "indexed"
-        # Also mark as configured since we indexed it with specific settings
-        doc.is_configured = True
-    except Exception as e:
-        doc.status = "failed"
-        doc.error_msg = str(e)
-        await db.commit()
-        raise HTTPException(status_code=500, detail=str(e))
-        
-    await db.commit()
-    return {"status": "success"}
+    # Add background task
+    background_tasks.add_task(background_index_document, doc_id, request.provider, request.model)
+    
+    return {"status": "processing", "message": "Indexing started in background"}
 
 @router.get("/admin/ollama/models")
 async def list_ollama_models(

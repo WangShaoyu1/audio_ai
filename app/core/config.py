@@ -28,7 +28,7 @@ class Settings(BaseSettings):
         return f"postgresql+asyncpg://{self.POSTGRES_USER}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     # Redis
-    REDIS_HOST: str = "localhost"
+    REDIS_HOST: str = "127.0.0.1"
     REDIS_PORT: int = 6379
 
     # Web Search Configuration
@@ -104,7 +104,7 @@ class Settings(BaseSettings):
     EMBEDDING_API_BASE: Optional[str] = None # Optional override
 
     # Ollama Configuration
-    OLLAMA_API_BASE: str = "http://localhost:11434"
+    OLLAMA_API_BASE: str = "http://127.0.0.1:11434"
 
     # RAG Default Configuration
     RAG_CHUNK_SIZE: int = 1000
@@ -116,6 +116,7 @@ class Settings(BaseSettings):
 
     # Memory Configuration
     # Short-term memory (Redis)
+    SHORT_TERM_MEMORY_ENABLE: bool = True  # Enable Redis short-term memory
     SHORT_TERM_MEMORY_MAX_SIZE: int = 10  # Max number of messages in Redis short-term memory
     SHORT_TERM_MEMORY_TTL_SECONDS: int = 1800  # 30 minutes TTL for Redis short-term memory
 

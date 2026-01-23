@@ -107,7 +107,13 @@ export default function VoiceVisualizer({ isActive, isProcessing }: VoiceVisuali
   return (
     <canvas 
       ref={canvasRef} 
-      className="w-full h-full absolute inset-0 pointer-events-none"
+      style={{
+        width: '100%',
+        height: '100%',
+        position: 'absolute',
+        inset: 0,
+        pointerEvents: 'none'
+      }}
     />
   );
 }

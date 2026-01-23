@@ -1,27 +1,19 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
+import { Form, Input, Button, Card, App, Typography, theme } from "antd";
 import { LanguageToggle } from "@/components/LanguageToggle";
 
+const { Title, Text } = Typography;
+
 export default function Login() {
-  const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
   const [, setLocation] = useLocation();
   const { t } = useTranslation();
+  const { message } = App.useApp();
+  const { token } = theme.useToken();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!phone) {
-      toast.error(t("login.error.phoneRequired"));
-      return;
-    }
-
+  const onFinish = async (values: { phone: string }) => {
     setLoading(true);
 
     try {
@@ -30,7 +22,7 @@ export default function Login() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify({ phone: values.phone }),
       });
 
       const contentType = response.headers.get("content-type");
@@ -47,49 +39,58 @@ export default function Login() {
       // Store token in localStorage
       localStorage.setItem("token", data.access_token);
       
-      toast.success(t("login.success"));
+      message.success(t("login.success"));
       setLocation("/");
     } catch (error: any) {
       console.error("Login error:", error);
-      toast.error(error.message || t("login.failed"));
+      message.error(error.message || t("login.failed"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 p-4 relative">
-      <div className="absolute top-4 right-4">
+    <div style={{ 
+      minHeight: '100vh', 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      backgroundColor: token.colorBgLayout,
+      padding: 16,
+      position: 'relative'
+    }}>
+      <div style={{ position: 'absolute', top: 16, right: 16 }}>
         <LanguageToggle />
       </div>
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">{t("login.title")}</CardTitle>
-          <CardDescription className="text-center">
-            {t("login.subtitle")}
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handleLogin}>
-          <CardContent className="space-y-4 mb-4">
-            <div className="space-y-2">
-              <Label htmlFor="phone">{t("login.phoneLabel")}</Label>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder={t("login.phonePlaceholder")}
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                disabled={loading}
-                required
-              />
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button className="w-full" type="submit" disabled={loading}>
+      <Card style={{ width: '100%', maxWidth: 400 }}>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <Title level={2} style={{ margin: 0 }}>{t("login.title")}</Title>
+          <Text type="secondary">{t("login.subtitle")}</Text>
+        </div>
+        
+        <Form
+          name="login"
+          onFinish={onFinish}
+          layout="vertical"
+          disabled={loading}
+        >
+          <Form.Item
+            label={t("login.phoneLabel")}
+            name="phone"
+            rules={[{ required: true, message: t("login.error.phoneRequired") }]}
+          >
+            <Input 
+              placeholder={t("login.phonePlaceholder")} 
+              size="large"
+            />
+          </Form.Item>
+
+          <Form.Item>
+            <Button type="primary" htmlType="submit" block size="large" loading={loading}>
               {loading ? t("login.loggingIn") : t("login.submit")}
             </Button>
-          </CardFooter>
-        </form>
+          </Form.Item>
+        </Form>
       </Card>
     </div>
   );

@@ -154,9 +154,13 @@ class DialogueManager:
         first_token = True
         async for chunk in generator:
             if first_token:
-                metadata["latency"]["ttft_ms"] = int((time.time() - start_time) * 1000)
+                now = time.time()
+                metadata["latency"]["ttft_ms"] = int((now - start_time) * 1000)
                 first_token = False
             yield chunk
+
+        # Final metadata update
+        metadata["latency"]["total_ms"] = int((time.time() - start_time) * 1000)
 
     async def stream_process_request(self, session_id: str, query: str, user_id: str, db: AsyncSession,
                                      trace_id: Optional[str] = None):

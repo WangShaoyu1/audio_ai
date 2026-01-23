@@ -1,15 +1,11 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
-import { Plus, Terminal, Trash2, RefreshCw, Upload, UploadCloud, ChevronLeft, ChevronRight, Copy, Check, ChevronDown, ChevronUp } from "lucide-react";
+import { Button, Card, Input, Table, Modal, message, theme, Upload as AntUpload } from "antd";
+import { PlusOutlined, ReloadOutlined, UploadOutlined, CloudUploadOutlined, DeleteOutlined, CopyOutlined, CheckOutlined, DownOutlined, UpOutlined, CodeOutlined } from "@ant-design/icons";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import type { UploadProps } from 'antd';
+
+const { TextArea } = Input;
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -26,50 +22,65 @@ function CopyButton({ text }: { text: string }) {
 
   return (
     <Button
-      variant="ghost"
-      size="icon"
-      className="h-6 w-6 absolute top-2 right-2 text-muted-foreground hover:text-foreground bg-background/80 backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100"
+      type="text"
+      size="small"
+      icon={copied ? <CheckOutlined style={{ color: '#52c41a' }} /> : <CopyOutlined />}
       onClick={handleCopy}
-    >
-      {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-    </Button>
+      style={{ position: 'absolute', top: 4, right: 4 }}
+    />
   );
 }
 
 function JsonParameterDisplay({ data }: { data: any }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const { token } = theme.useToken();
   const jsonString = JSON.stringify(data, null, 2);
   const compactString = JSON.stringify(data);
 
   if (!isExpanded) {
     return (
       <div 
-        className="w-[400px] cursor-pointer rounded-md border border-dashed p-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors flex items-center justify-between group"
+        style={{ 
+          cursor: 'pointer', 
+          border: `1px dashed ${token.colorBorder}`, 
+          padding: '8px', 
+          borderRadius: token.borderRadius,
+          color: token.colorTextSecondary,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          maxWidth: 400
+        }}
         onClick={() => setIsExpanded(true)}
         title="Click to expand"
       >
-        <span className="font-mono truncate">{compactString}</span>
-        <ChevronDown className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2" />
+        <span style={{ fontFamily: 'monospace', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{compactString}</span>
+        <DownOutlined style={{ fontSize: 12, marginLeft: 8 }} />
       </div>
     );
   }
 
   return (
-    <div className="relative rounded-md border bg-muted/50 group">
+    <div style={{ position: 'relative', borderRadius: token.borderRadius, border: `1px solid ${token.colorBorder}`, background: token.colorFillAlter }}>
       <div 
-        className="absolute top-2 right-8 z-10 cursor-pointer p-1 text-muted-foreground hover:text-foreground rounded-sm hover:bg-background/50 transition-colors"
+        style={{ 
+          position: 'absolute', 
+          top: 4, 
+          right: 32, 
+          zIndex: 10, 
+          cursor: 'pointer',
+          padding: 4
+        }}
         onClick={(e) => {
           e.stopPropagation();
           setIsExpanded(false);
         }}
         title="Collapse"
       >
-        <ChevronUp className="w-3 h-3" /> 
+        <UpOutlined style={{ fontSize: 12 }} /> 
       </div>
-      <div className="max-h-[150px] overflow-y-auto p-3 font-mono text-xs">
-        <pre className="whitespace-pre-wrap break-words">
-          {jsonString}
-        </pre>
+      <div style={{ maxHeight: 150, overflowY: 'auto', padding: 12, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+        {jsonString}
       </div>
       <CopyButton text={jsonString} />
     </div>
@@ -92,7 +103,7 @@ export default function Instructions() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
   const [newInstruction, setNewInstruction] = useState({
     name: "",
@@ -100,11 +111,20 @@ export default function Instructions() {
     parameters: "{}"
   });
 
-  const fetchInstructions = async (currentPage = page) => {
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const fetchInstructions = async (currentPage = page, currentPageSize = pageSize, query = searchQuery) => {
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`/api/v1/admin/instructions?page=${currentPage}&page_size=${pageSize}`, {
+      const url = new URL("/api/v1/admin/instructions", window.location.origin);
+      url.searchParams.append("page", currentPage.toString());
+      url.searchParams.append("page_size", currentPageSize.toString());
+      if (query) {
+        url.searchParams.append("q", query);
+      }
+
+      const response = await fetch(url.toString(), {
         headers: {
           "Authorization": `Bearer ${token}`
         }
@@ -114,26 +134,20 @@ export default function Instructions() {
       setInstructions(data.items || []);
       setTotal(data.total || 0);
     } catch (error) {
-      toast.error(t("instructions.loadError"));
+      message.error(t("instructions.loadError"));
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchInstructions();
-  }, [page]);
+    fetchInstructions(page, pageSize);
+  }, [page, pageSize]);
 
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= Math.ceil(total / pageSize)) {
-      setPage(newPage);
-    }
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-    }
+  const handleSearch = (value: string) => {
+    setSearchQuery(value);
+    setPage(1);
+    fetchInstructions(1, pageSize, value);
   };
 
   const handleUpload = async () => {
@@ -150,14 +164,15 @@ export default function Instructions() {
         body: formData
       });
       if (response.ok) {
-        toast.success(t("instructions.importSuccess"));
+        message.success(t("instructions.importSuccess"));
         setUploadDialogOpen(false);
+        setSelectedFile(null);
         fetchInstructions();
       } else {
         throw new Error("Upload failed");
       }
     } catch (error) {
-      toast.error(t("instructions.importError"));
+      message.error(t("instructions.importError"));
     }
   };
 
@@ -168,7 +183,7 @@ export default function Instructions() {
       try {
         parsedParams = JSON.parse(newInstruction.parameters);
       } catch (e) {
-        toast.error(t("instructions.jsonError"));
+        message.error(t("instructions.jsonError"));
         return;
       }
 
@@ -187,212 +202,230 @@ export default function Instructions() {
 
       if (!response.ok) throw new Error("Failed to create instruction");
       
-      toast.success(t("instructions.createSuccess"));
+      message.success(t("instructions.createSuccess"));
       setOpen(false);
       setNewInstruction({ name: "", description: "", parameters: "{}" });
       fetchInstructions();
     } catch (error) {
-      toast.error(t("instructions.createError"));
+      message.error(t("instructions.createError"));
     }
   };
 
-  return (
-    <div className="h-full overflow-y-auto">
-      <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">{t("instructions.title")}</h1>
-        <div className="flex gap-2 items-center">
-          <Button variant="outline" onClick={() => setUploadDialogOpen(true)}>
-            <Upload className="w-4 h-4 mr-2" />
-            {t("instructions.importBtn")}
-          </Button>
+  const handleDelete = (id: string) => {
+    Modal.confirm({
+      title: t("common.delete"),
+      content: t("instructions.deleteConfirm"),
+      okText: t("common.confirm"),
+      cancelText: t("common.cancel"),
+      okType: 'danger',
+      onOk: async () => {
+        try {
+          const token = localStorage.getItem("token");
+          const response = await fetch(`/api/v1/admin/instructions/${id}`, {
+            method: "DELETE",
+            headers: {
+              "Authorization": `Bearer ${token}`
+            }
+          });
+          
+          if (response.ok) {
+            message.success(t("common.success"));
+            fetchInstructions();
+          } else {
+            throw new Error("Failed to delete");
+          }
+        } catch (error) {
+          message.error(t("common.error"));
+        }
+      }
+    });
+  };
 
-          <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-            <DialogContent className="sm:max-w-[512px]">
-              <DialogHeader>
-                <DialogTitle>{t("instructions.batchImportTitle")}</DialogTitle>
-              </DialogHeader>
-              
-              <div className="py-6">
-                <div 
-                  className="border-2 border-dashed border-muted-foreground/25 hover:border-muted-foreground/50 hover:bg-muted/50 rounded-lg h-[200px] flex flex-col items-center justify-center cursor-pointer transition-all group"
-                  onClick={() => document.getElementById('file-upload')?.click()}
-                >
-                  <input
-                    id="file-upload"
-                    type="file"
-                    className="hidden"
-                    accept=".xlsx,.xls,.csv"
-                    onChange={handleFileSelect}
-                  />
-                  <UploadCloud className="w-16 h-16 text-muted-foreground/40 group-hover:text-muted-foreground/60 transition-colors mb-4" />
-                  <span className="text-blue-500 font-medium">{selectedFile ? selectedFile.name : t("instructions.uploadFile")}</span>
-                </div>
+  const uploadProps: UploadProps = {
+    beforeUpload: (file) => {
+      setSelectedFile(file);
+      return false;
+    },
+    onRemove: () => {
+      setSelectedFile(null);
+    },
+    fileList: selectedFile ? [selectedFile as any] : [],
+    maxCount: 1,
+    accept: ".xlsx,.xls,.csv"
+  };
 
-                <div className="mt-6 space-y-2 text-sm text-muted-foreground">
-                  <div className="flex items-center flex-wrap gap-1">
-                    <span>{t("instructions.uploadStep1")}</span>
-                    <span>(</span>
-                    <span 
-                      className="text-blue-500 hover:underline cursor-pointer"
-                      onClick={() => window.open("/api/v1/templates/instructions", "_blank")}
-                    >
-                      {t("batchEval.downloadTemplate")}
-                    </span>
-                    <span>)</span>
-                  </div>
-                  <div>{t("instructions.uploadStep2")}</div>
-                </div>
-              </div>
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>{t("home.cancel")}</Button>
-                <Button onClick={handleUpload} disabled={!selectedFile}>
-                  {t("home.confirm")}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <Button variant="outline" onClick={() => fetchInstructions()} disabled={loading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-            {t("kb.refresh")}
-          </Button>
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                {t("instructions.createBtn")}
-              </Button>
-            </DialogTrigger>
-            <DialogContent onPointerDownOutside={(e) => e.preventDefault()}>
-              <DialogHeader>
-                <DialogTitle>{t("instructions.createDialogTitle")}</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">{t("instructions.labelName")}</Label>
-                  <Input
-                    id="name"
-                    value={newInstruction.name}
-                    onChange={(e) => setNewInstruction({ ...newInstruction, name: e.target.value })}
-                    placeholder={t("instructions.placeholderName")}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">{t("instructions.labelDesc")}</Label>
-                  <Textarea
-                    id="description"
-                    value={newInstruction.description}
-                    onChange={(e) => setNewInstruction({ ...newInstruction, description: e.target.value })}
-                    placeholder={t("instructions.placeholderDesc")}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="parameters">{t("instructions.labelParams")}</Label>
-                  <Textarea
-                    id="parameters"
-                    value={newInstruction.parameters}
-                    onChange={(e) => setNewInstruction({ ...newInstruction, parameters: e.target.value })}
-                    placeholder="{}"
-                    className="font-mono"
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setOpen(false)}>{t("home.cancel")}</Button>
-                <Button onClick={handleCreate}>{t("instructions.btnCreate")}</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-          <LanguageToggle />
+  const columns = [
+    {
+      title: t("instructions.colName"),
+      dataIndex: 'name',
+      key: 'name',
+      width: 200,
+      render: (text: string) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <CodeOutlined style={{ color: '#722ed1' }} />
+          <span style={{ wordBreak: 'break-all' }}>{text}</span>
         </div>
-      </div>
+      ),
+    },
+    {
+      title: t("instructions.colDesc"),
+      dataIndex: 'description',
+      key: 'description',
+      width: 500,
+      render: (text: string) => (
+        <div style={{ maxHeight: 150, overflowY: 'auto', whiteSpace: 'normal', wordBreak: 'break-word' }}>
+          {text}
+        </div>
+      ),
+    },
+    {
+      title: t("instructions.colParams"),
+      dataIndex: 'parameters',
+      key: 'parameters',
+      width: 400,
+      render: (params: any) => <JsonParameterDisplay data={params} />,
+    },
+    {
+      title: t("instructions.colActions"),
+      key: 'actions',
+      width: 100,
+      align: 'right' as const,
+      render: (_: any, record: Instruction) => (
+        <Button 
+          type="text" 
+          danger 
+          icon={<DeleteOutlined />} 
+          onClick={() => handleDelete(record.id)}
+        />
+      ),
+    },
+  ];
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("instructions.listTitle")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[200px]">{t("instructions.colName")}</TableHead>
-                  <TableHead className="max-w-[500px]">{t("instructions.colDesc")}</TableHead>
-                  <TableHead className="w-[400px]">{t("instructions.colParams")}</TableHead>
-                  <TableHead className="text-right w-[100px]">{t("instructions.colActions")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {instructions.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                      {t("instructions.noData")}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  instructions.map((inst) => (
-                    <TableRow key={inst.id}>
-                      <TableCell className="font-medium align-top">
-                        <div className="flex items-center gap-2">
-                          <Terminal className="w-4 h-4 text-purple-500 shrink-0" />
-                          <span className="break-all">{inst.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="align-top">
-                        <div className="max-h-[150px] overflow-y-auto pr-2 whitespace-normal break-words">
-                          {inst.description}
-                        </div>
-                      </TableCell>
-                      <TableCell className="align-top">
-                        <JsonParameterDisplay data={inst.parameters} />
-                      </TableCell>
-                      <TableCell className="text-right align-top">
-                        <Button variant="ghost" size="icon" className="text-red-400 hover:text-red-300 hover:bg-red-500/20">
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+  return (
+    <div style={{ height: '100%', overflowY: 'auto', padding: 24 }}>
+      <div style={{ margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h1 style={{ fontSize: 24, fontWeight: 'bold', margin: 0 }}>{t("instructions.title")}</h1>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Input.Search
+              placeholder={t("home.searchPlaceholder")}
+              onSearch={handleSearch}
+              style={{ width: 200 }}
+              allowClear
+            />
+            <Button onClick={() => setUploadDialogOpen(true)} icon={<UploadOutlined />}>
+              {t("instructions.importBtn")}
+            </Button>
+
+            <Button onClick={() => fetchInstructions()} disabled={loading} icon={<ReloadOutlined spin={loading} />}>
+              {t("kb.refresh")}
+            </Button>
+            
+            <Button type="primary" onClick={() => setOpen(true)} icon={<PlusOutlined />}>
+              {t("instructions.createBtn")}
+            </Button>
+            
+            <LanguageToggle />
           </div>
+        </div>
 
-          <div className="flex items-center justify-between space-x-2 py-4">
-            <div className="text-sm text-muted-foreground">
-              {total > 0 ? (
-                <span>
-                  {((page - 1) * pageSize) + 1}-{Math.min(page * pageSize, total)} of {total}
+        <Card title={t("instructions.listTitle")}>
+          <Table
+            dataSource={instructions}
+            columns={columns}
+            rowKey="id"
+            pagination={{
+              current: page,
+              pageSize: pageSize,
+              total: total,
+              onChange: (p, ps) => {
+                setPage(p);
+                setPageSize(ps);
+              },
+              showSizeChanger: true
+            }}
+            locale={{ emptyText: t("instructions.noData") }}
+          />
+        </Card>
+
+        {/* Create Dialog */}
+        <Modal
+          title={t("instructions.createDialogTitle")}
+          open={open}
+          onCancel={() => setOpen(false)}
+          onOk={handleCreate}
+          okText={t("instructions.btnCreate")}
+          cancelText={t("home.cancel")}
+          maskClosable={false}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '16px 0' }}>
+            <div>
+              <div style={{ marginBottom: 8 }}>{t("instructions.labelName")}</div>
+              <Input
+                value={newInstruction.name}
+                onChange={(e) => setNewInstruction({ ...newInstruction, name: e.target.value })}
+                placeholder={t("instructions.placeholderName")}
+              />
+            </div>
+            <div>
+              <div style={{ marginBottom: 8 }}>{t("instructions.labelDesc")}</div>
+              <TextArea
+                value={newInstruction.description}
+                onChange={(e) => setNewInstruction({ ...newInstruction, description: e.target.value })}
+                placeholder={t("instructions.placeholderDesc")}
+                rows={4}
+              />
+            </div>
+            <div>
+              <div style={{ marginBottom: 8 }}>{t("instructions.labelParams")}</div>
+              <TextArea
+                value={newInstruction.parameters}
+                onChange={(e) => setNewInstruction({ ...newInstruction, parameters: e.target.value })}
+                placeholder="{}"
+                rows={4}
+                style={{ fontFamily: 'monospace' }}
+              />
+            </div>
+          </div>
+        </Modal>
+
+        {/* Upload Dialog */}
+        <Modal
+          title={t("instructions.batchImportTitle")}
+          open={uploadDialogOpen}
+          onCancel={() => setUploadDialogOpen(false)}
+          onOk={handleUpload}
+          okText={t("home.confirm")}
+          cancelText={t("home.cancel")}
+          okButtonProps={{ disabled: !selectedFile }}
+          maskClosable={false}
+        >
+          <div style={{ padding: '24px 0' }}>
+            <AntUpload.Dragger {...uploadProps} showUploadList={false}>
+              <p className="ant-upload-drag-icon">
+                <CloudUploadOutlined />
+              </p>
+              <p className="ant-upload-text">
+                {selectedFile ? selectedFile.name : t("instructions.uploadFile")}
+              </p>
+            </AntUpload.Dragger>
+
+            <div style={{ marginTop: 24, fontSize: 14, color: 'rgba(0, 0, 0, 0.45)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                <span>{t("instructions.uploadStep1")}</span>
+                <span>(</span>
+                <span 
+                  style={{ color: '#1677ff', cursor: 'pointer' }}
+                  onClick={() => window.open("/api/v1/templates/instructions", "_blank")}
+                >
+                  {t("batchEval.downloadTemplate")}
                 </span>
-              ) : (
-                <span>0 of 0</span>
-              )}
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(page - 1)}
-                disabled={page <= 1 || loading}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="text-sm font-medium">
-                Page {page} of {Math.max(1, Math.ceil(total / pageSize))}
+                <span>)</span>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handlePageChange(page + 1)}
-                disabled={page >= Math.ceil(total / pageSize) || loading}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              <div>{t("instructions.uploadStep2")}</div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </Modal>
       </div>
     </div>
   );

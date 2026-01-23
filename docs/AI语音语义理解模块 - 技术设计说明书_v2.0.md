@@ -379,26 +379,77 @@ sequenceDiagram
     3.  **混合 (Hybrid)**: 将两路召回结果合并并去重。
     4.  **重排序 (Reranking)**: (可选) 使用专门的 Rerank 模型 (如 `bce-reranker-base_v1`) 或 RRF (Reciprocal Rank Fusion) 算法对合并后的结果进行二次打分排序，最终选取 Top-K 返回。
 
-#### 3.6.3. 向量服务扩展
-`Vector Service` 已扩展支持本地化部署方案，以满足数据隐私和成本控制需求。
+#### 3.6.3. 向量服务扩展与模型适配
+`Vector Service` 已扩展支持多厂商、多维度的向量模型，以适应不同场景下的精度与性能需求。
+
+*   **配置管理**:
+    *   **静态配置**: 前端维护一份 `embeddingModels.json` 配置文件，定义了主流厂商 (OpenAI, Azure, Qwen, Zhipu, Qianfan, Google 等) 的常用 Embedding 模型及其参数（如维度、描述）。
+    *   **动态获取**: 针对 Ollama 本地模型，系统通过 API 动态获取列表，并结合静态配置中的关键词规则（如过滤包含 "embed" 的模型）进行智能筛选，仅展示适用的向量模型。
 *   **支持 Provider**:
-    *   `OpenAI`: 默认云端方案 (text-embedding-3-small/large)。
-    *   `Ollama`: 支持本地运行模型 (如 `bge-large`, `nomic-embed-text`)，适合私有化部署。后端通过 Proxy 接口动态获取模型列表，前端下拉框自动同步。
+    *   `OpenAI/Azure`: 标准云端方案 (text-embedding-3-small/large, ada-002)。
+    *   `Ollama`: 本地私有化方案，支持 bge-m3, nomic-embed-text 等。
+    *   `Zhipu/Qianfan/Qwen`: 国内大模型厂商支持。
 
 #### 3.6.4. 文档处理工作流 (Document Processing Workflow)
-系统支持文档的“上传”与“索引”解耦，提供更灵活的管理能力。
-1.  **上传 (Upload)**: 用户上传文档 (PDF/TXT/MD)，系统仅解析文本内容并保存至数据库，状态为 `uploaded`。若上传失败，前端会自动刷新列表以显示失败记录。
+系统支持文档的“上传”与“索引”解耦，并允许为每个文档指定索引模型。
+
+1.  **上传 (Upload)**: 用户上传文档 (PDF/TXT/MD)，系统仅解析文本内容并保存至数据库，状态为 `uploaded`。
 2.  **手动索引 (Manual Indexing)**:
     *   用户在管理后台选择目标文档，点击“索引”。
-    *   **配置选择**: 用户可指定本次索引使用的 Provider (如 Ollama) 和 Model (如 `bge-large`, `nomic-embed-text`)。
-    *   **覆盖机制 (Overwrite Strategy)**: 系统采用**全量覆盖**策略。在索引开始前，会强制清空该文档 ID 下已存在的所有向量分块 (DocumentChunk)，防止重复数据堆积。随后执行 Split -> Embedding -> Store 流程。状态变更为 `processing` -> `indexed`。
-3.  **删除 (Delete)**: 支持级联删除，清理文档记录及其对应的所有向量分块 (DocumentChunk)。
+    *   **模型选择**: 弹窗加载 `embeddingModels.json` 及 Ollama 列表，用户可选择特定的 Provider 和 Model（界面提示模型维度，如 1536/1024/768）。
+    *   **覆盖机制 (Overwrite Strategy)**: 强制清空旧分块，执行 Split -> Embedding (使用选定模型) -> Store。
+3.  **维度存储策略 (Vector Storage Strategy)**:
+    *   数据库底层的 `embedding` 列采用灵活维度设计 (`Vector()`)，不再硬编码为 1536。
+    *   这使得同一张表可以同时存储来自 OpenAI (1536维)、Ollama/Nomic (768维)、Zhipu (1024维) 等不同模型的向量数据，为“多模型共存”打下基础。
 
-#### 3.6.5. RAG 召回测试与历史记录 (Recall Testing)
+#### 3.6.5. 多路召回与 RRF 融合 (Multi-Path Retrieval & RRF Fusion)
+针对知识库中可能同时存在多种向量模型（例如旧文档使用 OpenAI，新文档使用 Ollama）的情况，系统摒弃了传统的“强制统一模型”或“重索引”方案，采用了先进的 **多路召回 (Multi-Path Retrieval)** 策略，实现“上传即忘、全库召回”。
+
+*   **核心痛点**:
+    *   不同 Embedding 模型的向量空间不兼容，维度不同（如 1536 vs 1024）无法直接计算相似度。
+    *   传统的“一对一”匹配会导致用户切换模型后无法检索到旧文档。
+
+*   **解决方案流程**:
+    1.  **自动感知 (Auto-Detection)**: 系统在检索前，会自动扫描当前用户的文档库，识别出所有活跃的 `(provider, model)` 组合（例如：`[("openai", "text-embedding-3-small"), ("ollama", "nomic-embed-text")]`）。
+    2.  **并行多路搜索 (Parallel Multi-Path Search)**:
+        *   系统针对每一个活跃模型，分别调用对应的 Embedding API 生成 Query 向量。
+        *   **并发执行**多路向量检索：Query Vector A 仅在数据库中检索 provider=A 的文档；Query Vector B 检索 provider=B 的文档。
+    3.  **RRF 排名融合 (Reciprocal Rank Fusion)**:
+        *   由于不同模型的余弦相似度分数分布不同（例如模型 A 的 0.8 可能相当于模型 B 的 0.6），直接按分数排序是不公平的。
+        *   系统引入 **RRF 算法**，基于“排名”而非“绝对分数”进行融合。
+        *   **公式**: $Score(d) = \sum \frac{1}{k + rank(d)}$ (其中 $k$ 常取 60)。
+        *   该算法能有效平滑不同模型的差异，确保各路召回的 Top 结果都能在最终列表中得到合理展示。
+
+#### 3.6.6. RAG 召回测试与历史记录 (Recall Testing)
 为了便于调优 RAG 效果，系统提供了可视化的召回测试工具：
 *   **文档级测试**: 支持针对特定文档进行召回测试，测试记录 (RAGTestRecord) 绑定至文档 ID。
 *   **历史回溯**: 每次测试的 Query、召回结果 (包含 Score 和 Chunk Content) 均会被持久化存储。
 *   **交互界面**: 前端提供独立的测试视图，支持左侧历史记录列表与右侧详情展示的联动，并具备自适应布局与返回导航功能。
+
+#### 3.6.7. Ollama 向量化嵌入实现详解 (Ollama Vectorization Implementation)
+针对本地 Ollama 服务在处理大规模向量化任务时可能遇到的性能瓶颈与超时问题，系统在 `RAG Engine` 层面实现了深度优化的向量化流程。
+
+1.  **智能分块策略 (Smart Chunking Strategy)**
+    *   **背景**: 许多高性能的开源 Embedding 模型（如 `bge-large`, `bert-base`）通常具有较小的上下文窗口限制（通常为 512 Tokens）。若分块过大，会导致 Ollama 返回 500 错误或静默截断。
+    *   **策略**: 系统根据选择的模型名称进行动态判断。
+        *   **通用模型**: 默认使用 `RAG_CHUNK_SIZE=1000`。
+        *   **短窗口模型**: 若模型名包含 `bge` 或 `bert`，自动将 `chunk_size` 降级调整为 **500 字符**。
+    *   **优势**: 确保分块内容始终在模型的有效感受野内，最大化语义完整性并避免服务报错。
+
+2.  **批次处理机制 (Batch Processing)**
+    *   **问题**: 对于长文档（如几十万字的书籍），一次性请求嵌入会导致 HTTP 请求体过大或 Ollama 服务处理超时。
+    *   **方案**: 引入批处理机制，将切分后的 Chunks 按 **Batch Size = 10** 分组。
+    *   **流程**: 每次仅向 Ollama 发送 10 个文本段，等待返回后再处理下一组。这有效降低了本地服务的瞬时负载。
+
+3.  **增量提交与事务管理 (Incremental Commit)**
+    *   **传统痛点**: 只有当整个文档全部处理完成后才一次性 Commit。若中途发生网络抖动或超时，所有进度将丢失，且长事务会占用数据库大量资源。
+    *   **优化**: 采用“分批提交”模式。
+        *   每处理完一个 Batch（10个分块），立即将生成的 `DocumentChunk` 写入数据库并执行 `commit()`。
+        *   配合 **全局索引 (Global Indexing)** 逻辑，即使分批写入，也能保证 `chunk_index` 的连续性和正确性。
+    *   **收益**: 
+        *   支持断点续传（逻辑上），避免“功亏一篑”。
+        *   用户可在前端实时观测到索引进度的增长。
+        *   彻底解决了大事务导致的数据库锁等待与超时问题。
 
 ---
 
