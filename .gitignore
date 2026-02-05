@@ -13,3 +13,7 @@ frontend/.env.local
 # Logs
 uvicorn.log
 debug_routes.py
+
+.trae/
+tests/
+uploads/
