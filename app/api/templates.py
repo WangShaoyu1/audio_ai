@@ -29,14 +29,16 @@ import json
 from app.core.default_instructions import DEFAULT_INSTRUCTIONS
 
 @router.get("/templates/instructions")
-async def get_instructions_template():
+async def get_instructions_template(language: str = "zh"):
     # Prepare data from DEFAULT_INSTRUCTIONS
     names = []
     descriptions = []
     parameters = []
     mutex_configs = []
 
-    for instr in DEFAULT_INSTRUCTIONS:
+    instructions = DEFAULT_INSTRUCTIONS.get(language, DEFAULT_INSTRUCTIONS.get("zh", []))
+
+    for instr in instructions:
         names.append(instr["name"])
         descriptions.append(instr["description"])
         parameters.append(json.dumps(instr["parameters"], ensure_ascii=False))

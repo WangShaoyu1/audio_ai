@@ -37,7 +37,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { key: '/', label: t('nav.chatDebugger'), icon: <MessageOutlined /> },
     { key: '/knowledge-base', label: t('nav.knowledgeBase'), icon: <DatabaseOutlined /> },
     { key: '/batch-eval', label: t('nav.batchEval'), icon: <FileTextOutlined /> },
-    { key: '/instructions', label: t('nav.instructions'), icon: <SettingOutlined /> },
+    { key: '/instruction-repos', label: t('repos.title'), icon: <SettingOutlined /> },
   ];
 
   const handleLogout = () => {
@@ -47,7 +47,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       okText: t('layout.confirm'),
       cancelText: t('layout.cancel'),
       okType: 'danger',
-      maskClosable: true,
+      maskClosable: false,
       onOk() {
         localStorage.removeItem('token');
         window.location.href = '/login';

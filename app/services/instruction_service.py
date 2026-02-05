@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.instruction import Instruction
@@ -8,33 +8,40 @@ class InstructionService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_all_instructions(self, user_id: uuid.UUID) -> List[Instruction]:
-        result = await self.db.execute(
-            select(Instruction)
-            .where(Instruction.user_id == user_id)
-            .where(Instruction.is_active == True)
-        )
-        return result.scalars().all()
-
-    async def get_instructions_paginated(self, user_id: uuid.UUID, page: int, page_size: int) -> Dict[str, Any]:
-        from sqlalchemy import func
-        
-        # Count total
-        count_stmt = select(func.count()).select_from(Instruction).where(
+    async def get_all_instructions(self, user_id: uuid.UUID, repository_id: Optional[uuid.UUID] = None) -> List[Instruction]:
+        stmt = select(Instruction).where(
             Instruction.user_id == user_id,
             Instruction.is_active == True
         )
+        if repository_id:
+            stmt = stmt.where(Instruction.repository_id == repository_id)
+            
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
+
+    async def get_instructions_paginated(self, user_id: uuid.UUID, page: int, page_size: int, repository_id: Optional[uuid.UUID] = None) -> Dict[str, Any]:
+        from sqlalchemy import func
+        
+        # Base query conditions
+        conditions = [
+            Instruction.user_id == user_id,
+            Instruction.is_active == True
+        ]
+        if repository_id:
+            conditions.append(Instruction.repository_id == repository_id)
+        
+        # Count total
+        count_stmt = select(func.count()).select_from(Instruction).where(*conditions)
         total_result = await self.db.execute(count_stmt)
         total = total_result.scalar_one()
 
         # Get page items
         stmt = (
             select(Instruction)
-            .where(Instruction.user_id == user_id)
-            .where(Instruction.is_active == True)
+            .where(*conditions)
             .offset((page - 1) * page_size)
             .limit(page_size)
-            .order_by(Instruction.name.asc())  # Sort by name as updated_at is not available
+            .order_by(Instruction.name.asc())
         )
         result = await self.db.execute(stmt)
         items = result.scalars().all()
@@ -87,6 +94,8 @@ class InstructionService:
         return valid_actions
 
     async def create_instruction(self, data: Dict[str, Any], user_id: uuid.UUID) -> Instruction:
+        # Ensure repository_id is provided or handle it
+        # For now, data should contain repository_id
         instruction = Instruction(**data, user_id=user_id)
         self.db.add(instruction)
         await self.db.commit()

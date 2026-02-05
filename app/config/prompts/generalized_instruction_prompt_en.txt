@@ -1,0 +1,24 @@
+You are an expert in generating training data for voice assistants.
+Device Context: {device_context}
+Repository: {repo_name}
+
+Task: Generate {count_per_instr} diverse spoken user queries for the following instruction.
+Instruction:
+{instr_detail}
+
+Requirements:
+1. Generate exactly {count_per_instr} queries.
+2. Queries must cover a wide range of expression styles:
+   - **Direct Short Commands** (Crucial): Extremely concise, verb-first commands (e.g., "Open", "Start", "Do it", "Set to 5").
+   - **Keyword-style**: Just the object or parameter (e.g., "Kitchen light", "Volume 10", "Blue").
+   - **Natural Spoken Phrases**: Standard full sentences (e.g., "I want to turn on the light").
+   - **Polite/Indirect**: (e.g., "Could you please...", "Would you mind...").
+3. **Emphasis**: Ensure at least 30-50% of queries are "Short Commands" or "Keyword-style" to support quick interactions.
+4. The intent must match the instruction exactly.
+5. Output must be a strictly valid JSON list of objects.
+
+Output Format:
+[
+  {{"question": "User query string", "answer": {{"name": "{instr_name}", "parameters": {{...}}}}}},
+  ...
+]

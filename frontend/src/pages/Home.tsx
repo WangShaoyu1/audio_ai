@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, memo, useCallback } from 'react';
-import { Button, Input, Dropdown, MenuProps, Tooltip, Checkbox, Spin, theme, App, Layout, Typography, Space, Modal, AutoComplete } from 'antd';
-import { SendOutlined, PlusOutlined, MessageOutlined, MoreOutlined, DeleteOutlined, EditOutlined, ReloadOutlined } from "@ant-design/icons";
+import { useState, useEffect, useRef, memo } from 'react';
+import { Button, Input, Dropdown, MenuProps, Tooltip, Checkbox, Spin, theme, App, Layout, Typography, Space, Modal, AutoComplete, Form, Select, Switch, Row, Col,Card, Popconfirm } from 'antd';
+import { SendOutlined, PlusOutlined, MessageOutlined, MoreOutlined, DeleteOutlined, EditOutlined, ReloadOutlined, SettingOutlined, LikeOutlined, DislikeOutlined, LikeFilled, DislikeFilled } from "@ant-design/icons";
+import { api } from '@/lib/api';
 
 const { Header, Sider, Content } = Layout;
 const { Text, Title } = Typography;
@@ -18,12 +19,104 @@ interface Session {
   id: string;
   name: string;
   created_at: string;
+  timezone?: string;
 }
+
+const TIMEZONE_OPTIONS = [
+    { label: 'Asia/Shanghai (UTC+8)', value: 'Asia/Shanghai' },
+    { label: 'UTC', value: 'UTC' },
+    { label: 'Asia/Tokyo (UTC+9)', value: 'Asia/Tokyo' },
+    { label: 'America/New_York (UTC-5/UTC-4)', value: 'America/New_York' },
+    { label: 'America/Los_Angeles (UTC-8/UTC-7)', value: 'America/Los_Angeles' },
+    { label: 'Europe/London (UTC+0/UTC+1)', value: 'Europe/London' },
+    { label: 'Europe/Paris (UTC+1/UTC+2)', value: 'Europe/Paris' },
+    { label: 'Australia/Sydney (UTC+10/UTC+11)', value: 'Australia/Sydney' },
+];
+
+const LANGUAGE_OPTIONS = [
+    { label: '中文 (简体)', value: 'zh' },
+    { label: '中文 (繁體)', value: 'zh_TW' },
+    { label: 'English', value: 'en' },
+    { label: '日本語', value: 'ja' },
+    { label: 'Deutsch', value: 'de' },
+    { label: '한국어', value: 'ko' },
+];
+
+const PROVIDER_OPTIONS = [
+    { label: 'Default', value: '' },
+    { label: 'OpenAI', value: 'openai' },
+    { label: 'Qwen', value: 'qwen' },
+    { label: 'Minimax', value: 'minimax' },
+    { label: 'Spark', value: 'spark' },
+    { label: 'Google', value: 'google' },
+    { label: 'Deepseek', value: 'deepseek' },
+    { label: 'Zhipu', value: 'zhipu' },
+    { label: 'Baidu', value: 'baidu' },
+];
+
+const MODEL_OPTIONS: Record<string, { label: string, value: string }[]> = {
+    openai: [
+        { label: 'GPT-5.2', value: 'gpt-5.2' },
+        { label: 'GPT-5.2 Codex', value: 'gpt-5.2-codex' },
+        { label: 'GPT-4o', value: 'gpt-4o' },
+    ],
+    qwen: [
+        { label: 'Qwen Max (Latest)', value: 'qwen-max' },
+        { label: 'Qwen Plus', value: 'qwen-plus' },
+        { label: 'Qwen Flash', value: 'qwen-flash' },
+    ],
+    minimax: [
+        { label: 'MiniMax-Text-01 (Speed)', value: 'minimax-text-01' },
+        { label: 'ABAB 6.5s (Chat)', value: 'abab6.5s-chat' },
+        { label: '⚠️ MiniMax-M2.1 (Not Recommended)', value: 'minimax-m2.1' },
+        { label: '⚠️ MiniMax-M2.1 Lightning (Not Recommended)', value: 'minimax-m2.1-lightning' },
+    ],
+    spark: [
+        { label: 'Spark X1', value: 'spark-x1' },
+        { label: 'Spark 4.0 Ultra', value: 'spark-4.0-ultra' },
+    ],
+    google: [
+        { label: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro' },
+        { label: 'Gemini 2.5 Flash', value: 'gemini-2.5-flash' },
+    ],
+    deepseek: [
+        { label: 'DeepSeek V3.2', value: 'deepseek-chat' },
+        { label: 'DeepSeek R1', value: 'deepseek-reasoner' },
+    ],
+    zhipu: [
+        { label: 'GLM-4 Plus', value: 'glm-4-plus' },
+        { label: 'GLM-4 Flash', value: 'glm-4-flash' },
+        { label: 'GLM-4 Long', value: 'glm-4-long' },
+    ],
+    baidu: [
+        { label: 'ERNIE 4.0 8K', value: 'ernie-4.0-8k-latest' },
+        { label: 'ERNIE 3.5 8K', value: 'ernie-3.5-8k' },
+        { label: 'ERNIE Speed 8K', value: 'ernie-speed-8k' },
+        { label: 'ERNIE Lite 8K', value: 'ernie-lite-8k' },
+        { label: 'ERNIE Tiny 8K', value: 'ernie-tiny-8k' },
+        { label: 'ERNIE Speed 128K', value: 'ernie-speed-128k' },
+    ]
+};
 
 const BATCH_SIZE = 20;
 
 // Memoized Message Item Component
-const MessageItem = memo(({ msg, token, t, handleRetry }: { msg: Message, token: any, t: any, handleRetry: (id: string) => void }) => {
+const MessageItem = memo(({ msg, token, t, handleRetry, onFeedback, timezone = 'Asia/Shanghai' }: { 
+  msg: Message, 
+  token: any, 
+  t: any, 
+  handleRetry: (id: string) => void,
+  onFeedback: (id: string, feedback: 'like' | 'dislike') => void,
+  timezone?: string
+}) => {
+  const timeStr = new Intl.DateTimeFormat('default', {
+        timeZone: timezone,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+  }).format(new Date(msg.timestamp));
+
   return (
     <div id={`msg-${msg.id}`} style={{ display: 'flex', gap: 12, justifyContent: msg.role === 'user' ? "flex-end" : "flex-start", marginBottom: 16 }}>
       <div 
@@ -68,19 +161,22 @@ const MessageItem = memo(({ msg, token, t, handleRetry }: { msg: Message, token:
         )}
         
         {(msg.latency || msg.ttft) && (
-          <div style={{ fontSize: 10, opacity: 0.5, marginTop: 4 }}>
-              {msg.ttft ? (
-                  <>
-                      {t("chat.ttft")}: {msg.ttft}ms | {t("chat.totalLatency")}: {msg.latency || '-'}ms
-                  </>
-              ) : (
-                  <>
-                      {t("chat.totalLatency")}: {msg.latency}ms
-                  </>
-              )}
-               | {t("chat.route")}: {msg.intent}
-          </div>
+        <div style={{ fontSize: 10, opacity: 0.5, marginTop: 4, display: 'flex', justifyContent: 'flex-start', alignItems: 'center', gap: 8 }}>
+              <span>
+                  {msg.ttft !== undefined ? (
+                      <>
+                          {t("chat.ttft")}: {msg.ttft}ms | {t("chat.totalLatency")}: {msg.latency || '-'}ms
+                      </>
+                  ) : (
+                      <>
+                          {t("chat.totalLatency")}: {msg.latency}ms
+                      </>
+                  )}
+                   | {t("chat.route")}: {msg.intent}
+              </span>
+        </div>
         )}
+
         {msg.role === 'assistant' && (msg.content === '' || msg.content.includes('[System Error:') || msg.isError) && (
           <div style={{ position: 'absolute', bottom: 4, right: 4 }}>
               <Tooltip title={t("common.retry")}>
@@ -94,6 +190,27 @@ const MessageItem = memo(({ msg, token, t, handleRetry }: { msg: Message, token:
           </div>
         )}
       </div>
+
+      {msg.role === 'assistant' && !msg.isError && msg.intent === 'instruction' && (
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4 }}>
+            <Tooltip title={t("feedback.like")}>
+              <Button 
+                type="text" 
+                size="small" 
+                icon={msg.feedback === 'like' ? <LikeFilled style={{ color: '#52c41a' }} /> : <LikeOutlined style={{ color: token.colorTextDescription }} />} 
+                onClick={() => onFeedback(msg.id, 'like')}
+              />
+            </Tooltip>
+            <Tooltip title={t("feedback.dislike")}>
+              <Button 
+                type="text" 
+                size="small" 
+                icon={msg.feedback === 'dislike' ? <DislikeFilled style={{ color: '#ff4d4f' }} /> : <DislikeOutlined style={{ color: token.colorTextDescription }} />} 
+                onClick={() => onFeedback(msg.id, 'dislike')}
+              />
+            </Tooltip>
+          </div>
+       )}
     </div>
   );
 }, (prev, next) => {
@@ -102,15 +219,33 @@ const MessageItem = memo(({ msg, token, t, handleRetry }: { msg: Message, token:
          prev.msg.latency === next.msg.latency &&
          prev.msg.ttft === next.msg.ttft &&
          prev.msg.isError === next.msg.isError &&
-         prev.token.colorPrimary === next.token.colorPrimary;
+         prev.msg.feedback === next.msg.feedback &&
+         prev.token.colorPrimary === next.token.colorPrimary &&
+         prev.timezone === next.timezone;
 });
 
 // Memoized Message List Component
-const MessageList = memo(({ messages, token, t, handleRetry, isProcessing }: { messages: Message[], token: any, t: any, handleRetry: (id: string) => void, isProcessing: boolean }) => {
+const MessageList = memo(({ messages, token, t, handleRetry, isProcessing, onFeedback, timezone }: { 
+  messages: Message[], 
+  token: any, 
+  t: any, 
+  handleRetry: (id: string) => void, 
+  isProcessing: boolean,
+  onFeedback: (id: string, feedback: 'like' | 'dislike') => void,
+  timezone?: string
+}) => {
   return (
     <>
       {messages.map(msg => (
-        <MessageItem key={msg.id} msg={msg} token={token} t={t} handleRetry={handleRetry} />
+        <MessageItem 
+          key={msg.id} 
+          msg={msg} 
+          token={token} 
+          t={t} 
+          handleRetry={handleRetry} 
+          onFeedback={onFeedback}
+          timezone={timezone}
+        />
       ))}
       {isProcessing && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-start' }}>
@@ -145,6 +280,9 @@ export default function Home() {
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [sessionToRename, setSessionToRename] = useState<Session | null>(null);
   const [newName, setNewName] = useState("");
+  const [sessionToConfig, setSessionToConfig] = useState<Session | null>(null);
+  const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
+  const [configForm] = Form.useForm();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [logClearTimestamp, setLogClearTimestamp] = useState(0);
@@ -156,9 +294,26 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [targetMessageId, setTargetMessageId] = useState<string | null>(null);
 
+  const selectedRepoId = Form.useWatch('INSTRUCTION_REPO_ID', configForm);
+  const selectedLanguage = Form.useWatch('language', configForm);
+  const [instructionRepos, setInstructionRepos] = useState<any[]>([]);
+
+  const selectedRepo = instructionRepos.find(r => r.id === selectedRepoId);
+  const isLanguageMismatch = selectedRepo && selectedRepo.language && selectedLanguage && selectedRepo.language !== selectedLanguage;
+
   useEffect(() => {
     fetchSessions();
+    fetchInstructionRepos();
   }, []);
+
+  const fetchInstructionRepos = async () => {
+    try {
+      const repos = await api.instructionRepos.list();
+      setInstructionRepos(repos);
+    } catch (error) {
+      console.error("Failed to load instruction repos", error);
+    }
+  };
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -186,6 +341,8 @@ export default function Home() {
         }
     }
   }, [messages, targetMessageId]);
+
+  const currentSession = sessions.find(s => s.id === currentSessionId);
 
   useEffect(() => {
     if (searchQuery.trim()) {
@@ -232,9 +389,23 @@ export default function Home() {
     }
   };
 
-  const createSession = () => {
-    setCurrentSessionId(null);
-    setMessages([]);
+  const createSession = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/v1/sessions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const newSession = await res.json();
+        setSessions(prev => [newSession, ...prev]);
+        selectSession(newSession.id);
+        // Open config dialog immediately for the new session
+        // openConfigDialog(newSession); // Optional: if we want to force config
+      }
+    } catch (error) {
+      console.error("Failed to create session", error);
+    }
   };
 
   const loadHistory = async (sessionId: string, offsetVal: number, isInitial: boolean) => {
@@ -329,6 +500,52 @@ export default function Home() {
     }
   };
 
+
+  const openConfigDialog = async (session: Session) => {
+      setSessionToConfig(session);
+      setIsConfigDialogOpen(true);
+      configForm.resetFields();
+      fetchInstructionRepos();
+      try {
+          const token = localStorage.getItem("token");
+          const res = await fetch(`/api/v1/sessions/${session.id}/config`, {
+              headers: { Authorization: `Bearer ${token}` }
+          });
+          if (res.ok) {
+              const data = await res.json();
+              configForm.setFieldsValue(data);
+          }
+      } catch (e) {
+          console.error("Failed to load config", e);
+      }
+  };
+
+  const saveConfig = async () => {
+      if (!sessionToConfig) return;
+      try {
+          const values = await configForm.validateFields();
+          const token = localStorage.getItem("token");
+          const res = await fetch(`/api/v1/sessions/${sessionToConfig.id}/config`, {
+              method: "PUT",
+              headers: { 
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}` 
+              },
+              body: JSON.stringify(values)
+          });
+          if (res.ok) {
+              message.success(t("home.configSaved") || "Configuration saved");
+              setIsConfigDialogOpen(false);
+              // Refresh sessions to update timezone in currentSession
+              fetchSessions();
+          } else {
+              message.error("Failed to save configuration");
+          }
+      } catch (e) {
+          console.error("Failed to save config", e);
+      }
+  };
+
   const confirmDeleteSession = (sessionId: string) => {
     modal.confirm({
       title: t("home.deleteSession"),
@@ -336,6 +553,7 @@ export default function Home() {
       okText: t("home.confirm"),
       cancelText: t("home.cancel"),
       okType: 'danger',
+      maskClosable: false,
       onOk: () => deleteSession(sessionId),
     });
   };
@@ -348,10 +566,16 @@ export default function Home() {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
-        fetchSessions();
+        const newSessions = sessions.filter(s => s.id !== sessionId);
+        setSessions(newSessions);
+
         if (currentSessionId === sessionId) {
-          setCurrentSessionId(null);
-          setMessages([]);
+            if (newSessions.length > 0) {
+                selectSession(newSessions[0].id);
+            } else {
+                setCurrentSessionId(null);
+                setMessages([]);
+            }
         }
         message.success(t("home.deleteSuccess") || "Session deleted successfully");
       }
@@ -361,22 +585,7 @@ export default function Home() {
     }
   };
 
-  const handleRetry = useCallback((messageId: string) => {
-    // Retry logic needs access to messages state, but since we are in useCallback, we need to be careful.
-    // However, if we pass handleRetry to memoized component, it should be stable.
-    // We can't use closure 'messages' here effectively if it's stale.
-    // Better to just let it re-create when messages change? 
-    // Or use functional update.
-    // For now, let's keep it simple. It will invalidate memo if messages change, which is fine.
-    // Wait, if handleRetry changes on every render, MemoizedMessageList will re-render.
-    // We need to use a ref or something.
-    // Actually, retry is rare. Re-rendering is fine on retry.
-    // The main issue is INPUT typing. 
-    // On input typing, 'messages' DOES NOT change. So handleRetry doesn't need to change if it depends on messages?
-    // Ah, 'messages' is a dependency of handleRetry.
-    // If messages don't change, handleRetry doesn't change.
-    // So it's fine.
-  }, [messages]); 
+ 
 
   const realHandleRetry = (messageId: string) => {
      const msgIndex = messages.findIndex(m => m.id === messageId);
@@ -407,14 +616,34 @@ export default function Home() {
     }
   };
 
+  const handleFeedback = async (messageId: string, feedback: 'like' | 'dislike') => {
+    // Safety check for temporary IDs (timestamp-based)
+    if (messageId.length < 32 && !messageId.includes('-')) {
+        message.warning(t("feedback.waitId") || "Please wait for message ID to synchronize...");
+        return;
+    }
+
+    try {
+      await api.feedback.submit(messageId, feedback);
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId ? { ...msg, feedback } : msg
+      ));
+      message.success(t("feedback.success") || "Feedback submitted");
+    } catch (error) {
+      console.error("Feedback failed", error);
+      message.error(t("feedback.error") || "Failed to submit feedback");
+    }
+  };
+
   const handleSendMessage = async (text: string) => {
     if (!text.trim()) return;
     
     const startTime = Date.now();
     let ttfb: number | undefined;
 
+    const tempUserMsgId = Date.now().toString();
     const userMsg: Message = {
-      id: Date.now().toString(),
+      id: tempUserMsgId,
       role: 'user',
       content: text,
       timestamp: Date.now()
@@ -455,8 +684,9 @@ export default function Home() {
       if (isStream && res.body) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
+        const tempAssistantId = Date.now().toString();
         let assistantMsg: Message = {
-          id: Date.now().toString(),
+          id: tempAssistantId,
           role: 'assistant',
           content: '',
           timestamp: Date.now()
@@ -495,20 +725,31 @@ export default function Home() {
                       ttft: ttfb
                     };
                     setMessages(prev => prev.map(msg => 
-                      msg.id === assistantMsg.id ? assistantMsg : msg
+                      msg.id === tempAssistantId ? assistantMsg : msg
                     ));
                   }
                   if (data.metadata) {
+                    const realAssistantId = data.metadata.message_id;
+                    const realUserId = data.metadata.reply_to;
+                    
                     assistantMsg = {
                       ...assistantMsg,
+                      id: realAssistantId || assistantMsg.id,
                       latency: data.metadata.latency?.total_ms,
                       ttft: data.metadata.latency?.ttft_ms || ttfb,
                       intent: data.metadata.route,
                       metadata: data.metadata
                     };
-                    setMessages(prev => prev.map(msg => 
-                      msg.id === assistantMsg.id ? assistantMsg : msg
-                    ));
+                    
+                    setMessages(prev => prev.map(msg => {
+                      if (msg.id === tempAssistantId) {
+                          return assistantMsg;
+                      }
+                      if (msg.id === tempUserMsgId && realUserId) {
+                          return { ...msg, id: realUserId };
+                      }
+                      return msg;
+                    }));
                     
                     if (!currentSessionId && data.metadata.trace_id) {
                       fetchSessions();
@@ -522,7 +763,7 @@ export default function Home() {
           } catch (readError) {
              console.error("Stream read error", readError);
              setMessages(prev => prev.map(msg => 
-                msg.id === assistantMsg.id ? { ...msg, content: t("common.systemError"), isError: true } : msg
+                msg.id === tempAssistantId ? { ...msg, content: t("common.systemError"), isError: true } : msg
              ));
              break;
           }
@@ -530,8 +771,14 @@ export default function Home() {
         
         if (!hasContent && assistantMsg.content === '') {
              setMessages(prev => prev.map(msg => 
-                msg.id === assistantMsg.id ? { ...msg, content: t("common.systemError"), isError: true } : msg
+                msg.id === tempAssistantId ? { ...msg, content: t("common.systemError"), isError: true } : msg
              ));
+        }
+
+        // Refresh session list if the current session was "New Chat" to show the generated title
+        const currentSession = sessions.find(s => s.id === currentSessionId);
+        if (currentSession && (currentSession.name === "New Chat" || currentSession.name === "未命名会话")) {
+            fetchSessions();
         }
 
       } else {
@@ -553,17 +800,34 @@ export default function Home() {
            fetchSessions();
         }
 
+        const realAssistantId = result.metadata?.message_id;
+        const realUserId = result.metadata?.reply_to;
+
+        // Update User Message ID if available
+        if (realUserId) {
+            setMessages(prev => prev.map(msg => 
+                msg.id === tempUserMsgId ? { ...msg, id: realUserId } : msg
+            ));
+        }
+
         const assistantMsg: Message = {
-          id: Date.now().toString(),
+          id: realAssistantId || Date.now().toString(),
           role: 'assistant',
           content: result.content,
           timestamp: Date.now(),
           latency: result.metadata?.latency?.total_ms,
+          ttft: result.metadata?.latency?.ttft_ms,
           intent: result.metadata?.route,
           metadata: result.metadata
         };
         
         setMessages(prev => [...prev, assistantMsg]);
+
+        // Refresh session list if the current session was "New Chat"
+        const currentSession = sessions.find(s => s.id === currentSessionId);
+        if (currentSession && (currentSession.name === "New Chat" || currentSession.name === "未命名会话")) {
+             fetchSessions();
+        }
       }
     } catch (error) {
       console.error("Chat error", error);
@@ -580,6 +844,15 @@ export default function Home() {
   };
 
   const getSessionMenuItems = (session: Session): MenuProps['items'] => [
+    {
+      key: 'config',
+      label: t("home.config") || "Configuration",
+      icon: <SettingOutlined />,
+      onClick: ({ domEvent }) => {
+        domEvent.stopPropagation();
+        openConfigDialog(session);
+      }
+    },
     {
       key: 'rename',
       label: t("home.rename"),
@@ -619,7 +892,7 @@ export default function Home() {
                  placeholder={t("home.searchPlaceholder")}
                  value={searchQuery}
                  onChange={(value) => setSearchQuery(value)}
-                 onSelect={(value, option) => selectSession(option.session_id, option.key)}
+                 onSelect={(_, option) => selectSession(option.session_id, option.key)}
                  options={searchResults.map((result: any) => ({
                    value: result.session_name,
                    label: (
@@ -637,8 +910,8 @@ export default function Home() {
                </AutoComplete>
             </div>
             
-            <div style={{ padding: 16 }}>
-              <Button onClick={createSession} block icon={<PlusOutlined />} type="primary">
+            <div style={{ padding: 16, display: 'flex', gap: 8 }}>
+              <Button onClick={createSession} block icon={<PlusOutlined />} type="primary" style={{ flex: 1 }}>
                 {t("home.newChat")}
               </Button>
             </div>
@@ -732,6 +1005,8 @@ export default function Home() {
                       t={t} 
                       handleRetry={realHandleRetry}
                       isProcessing={isProcessing}
+                      onFeedback={handleFeedback}
+                      timezone={currentSession?.timezone}
                     />
 
                     <div ref={chatEndRef} />
@@ -756,7 +1031,7 @@ export default function Home() {
                             }}
                             placeholder={t("home.inputPlaceholder")}
                             autoSize={{ minRows: 1, maxRows: 6 }}
-                            bordered={false}
+                            variant="borderless"
                             style={{ resize: 'none', marginBottom: 8 }}
                         />
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -788,12 +1063,13 @@ export default function Home() {
               />
            </div>
         </Content>
-      </Layout>
+    </Layout>
 
       <Modal
         title={t("home.renameSession")}
         open={isRenameDialogOpen}
         onOk={renameSession}
+        maskClosable={false}
         onCancel={() => setIsRenameDialogOpen(false)}
         okText={t("home.save")}
         cancelText={t("home.cancel")}
@@ -803,6 +1079,230 @@ export default function Home() {
           onChange={(e) => setNewName(e.target.value)} 
           onPressEnter={renameSession}
         />
+      </Modal>
+
+      <Modal
+        title={t("home.sessionConfig") || "Session Configuration"}
+        open={isConfigDialogOpen}
+        onCancel={() => setIsConfigDialogOpen(false)}
+        width={1000}
+        maskClosable={false}
+        footer={[
+          <Button key="cancel" onClick={() => setIsConfigDialogOpen(false)}>
+            {t("home.cancel")}
+          </Button>,
+          isLanguageMismatch ? (
+            <Popconfirm
+              key="save-confirm"
+              title={t("config.languageMismatchTitle") || "Language Mismatch"}
+              description={t("config.languageMismatchDesc") || "The session language does not match the instruction repository language. This may affect recognition accuracy."}
+              onConfirm={saveConfig}
+              okText={t("common.confirm")}
+              cancelText={t("common.cancel")}
+            >
+              <Button key="save" type="primary">
+                {t("home.save")}
+              </Button>
+            </Popconfirm>
+          ) : (
+            <Button key="save" type="primary" onClick={saveConfig}>
+              {t("home.save")}
+            </Button>
+          )
+        ]}
+      >
+        <Form form={configForm} layout="vertical">
+            <Row gutter={16}>
+                <Col span={12}>
+                    <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
+                        <Card size="small" title={t("config.intentClassification") || "Intent Classification"}>
+                            <Row gutter={12}>
+                                <Col span={12}>
+                                    <Form.Item name="INTENT_LLM_PROVIDER" label={t("config.provider") || "Provider"} style={{ marginBottom: 0 }}>
+                                        <Select 
+                                            options={PROVIDER_OPTIONS} 
+                                            allowClear
+                                            onChange={() => configForm.setFieldValue('INTENT_LLM_MODEL', undefined)}
+                                        />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={12}>
+                                    <Form.Item 
+                                        noStyle 
+                                        shouldUpdate={(prev, current) => prev.INTENT_LLM_PROVIDER !== current.INTENT_LLM_PROVIDER}
+                                    >
+                                        {({ getFieldValue }) => {
+                                            const provider = getFieldValue('INTENT_LLM_PROVIDER');
+                                            return (
+                                                <Form.Item name="INTENT_LLM_MODEL" label={t("config.model") || "Model"} style={{ marginBottom: 0 }}>
+                                                    <Select options={provider ? MODEL_OPTIONS[provider] || [] : []} disabled={!provider} allowClear />
+                                                </Form.Item>
+                                            );
+                                        }}
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                        </Card>
+
+                        <Card size="small" title={t("config.instructionParsing") || "Instruction Parsing"}>
+                            <Form.Item 
+                                name="INSTRUCTION_REPO_ID" 
+                                label={t("config.instructionRepo") || "Instruction Repository"} 
+                                rules={[{ required: true, message: t("config.repoRequired") || "Required" }]}
+                                style={{ marginBottom: 16 }}
+                            >
+                                <Select 
+                                    placeholder={t("config.selectRepo")}
+                                    options={instructionRepos.map(repo => ({ label: repo.name, value: repo.id }))}
+                                />
+                            </Form.Item>
+                            <Row gutter={12}>
+                                <Col span={12}>
+                                    <Form.Item name="INSTRUCTION_LLM_PROVIDER" label={t("config.provider") || "Provider"} style={{ marginBottom: 0 }}>
+                                        <Select 
+                                            options={PROVIDER_OPTIONS} 
+                                            allowClear
+                                            onChange={() => configForm.setFieldValue('INSTRUCTION_LLM_MODEL', undefined)}
+                                        />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={12}>
+                                    <Form.Item 
+                                        noStyle 
+                                        shouldUpdate={(prev, current) => prev.INSTRUCTION_LLM_PROVIDER !== current.INSTRUCTION_LLM_PROVIDER}
+                                    >
+                                        {({ getFieldValue }) => {
+                                            const provider = getFieldValue('INSTRUCTION_LLM_PROVIDER');
+                                            return (
+                                                <Form.Item name="INSTRUCTION_LLM_MODEL" label={t("config.model") || "Model"} style={{ marginBottom: 0 }}>
+                                                    <Select options={provider ? MODEL_OPTIONS[provider] || [] : []} disabled={!provider} allowClear />
+                                                </Form.Item>
+                                            );
+                                        }}
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                        </Card>
+
+                        <Card
+                            size="small"
+                            title={t("config.ragGeneration") || "RAG Generation"}
+                            extra={
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <Typography.Text style={{ fontSize: 12 }}>{t("config.ragEnable") || "Enable RAG"}</Typography.Text>
+                                    <Form.Item name="RAG_ENABLE" valuePropName="checked" noStyle>
+                                        <Switch
+                                            size="small"
+                                            onChange={(checked) => {
+                                                if (!checked) {
+                                                    configForm.setFieldValue('RAG_LLM_PROVIDER', undefined);
+                                                    configForm.setFieldValue('RAG_LLM_MODEL', undefined);
+                                                }
+                                            }}
+                                        />
+                                    </Form.Item>
+                                </div>
+                            }
+                        >
+                            <Form.Item noStyle shouldUpdate={(prev, current) => prev.RAG_ENABLE !== current.RAG_ENABLE || prev.RAG_LLM_PROVIDER !== current.RAG_LLM_PROVIDER}>
+                                {({ getFieldValue }) => {
+                                    const ragEnabled = getFieldValue('RAG_ENABLE');
+                                    const provider = getFieldValue('RAG_LLM_PROVIDER');
+                                    return (
+                                        <Row gutter={12}>
+                                            <Col span={12}>
+                                                <Form.Item name="RAG_LLM_PROVIDER" label={t("config.provider") || "Provider"} style={{ marginBottom: 0 }}>
+                                                    <Select 
+                                                        options={PROVIDER_OPTIONS} 
+                                                        disabled={!ragEnabled} 
+                                                        allowClear
+                                                        onChange={() => configForm.setFieldValue('RAG_LLM_MODEL', undefined)}
+                                                    />
+                                                </Form.Item>
+                                            </Col>
+                                            <Col span={12}>
+                                                <Form.Item name="RAG_LLM_MODEL" label={t("config.model") || "Model"} style={{ marginBottom: 0 }}>
+                                                    <Select options={provider ? MODEL_OPTIONS[provider] || [] : []} disabled={!ragEnabled || !provider} allowClear />
+                                                </Form.Item>
+                                            </Col>
+                                        </Row>
+                                    );
+                                }}
+                            </Form.Item>
+                        </Card>
+                    </Space>
+                </Col>
+                
+                <Col span={12}>
+                    <Space orientation="vertical" size="middle" style={{ display: 'flex' }}>
+                        <Card size="small" title={t("config.chat") || "Chat"}>
+                            <Row gutter={12}>
+                                <Col span={12}>
+                                    <Form.Item name="CHAT_LLM_PROVIDER" label={t("config.provider") || "Provider"} style={{ marginBottom: 0 }}>
+                                        <Select options={PROVIDER_OPTIONS} />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={12}>
+                                    <Form.Item 
+                                        noStyle 
+                                        shouldUpdate={(prev, current) => prev.CHAT_LLM_PROVIDER !== current.CHAT_LLM_PROVIDER}
+                                    >
+                                        {({ getFieldValue }) => {
+                                            const provider = getFieldValue('CHAT_LLM_PROVIDER');
+                                            return (
+                                                <Form.Item name="CHAT_LLM_MODEL" label={t("config.model") || "Model"} style={{ marginBottom: 0 }}>
+                                                    <Select options={provider ? MODEL_OPTIONS[provider] || [] : []} disabled={!provider} />
+                                                </Form.Item>
+                                            );
+                                        }}
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                        </Card>
+
+                        <Card size="small" title={t("config.searchSummary") || "Search Summary"}>
+                            <Row gutter={12}>
+                                <Col span={12}>
+                                    <Form.Item name="SEARCH_LLM_PROVIDER" label={t("config.provider") || "Provider"} style={{ marginBottom: 0 }}>
+                                        <Select options={PROVIDER_OPTIONS} />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={12}>
+                                    <Form.Item 
+                                        noStyle 
+                                        shouldUpdate={(prev, current) => prev.SEARCH_LLM_PROVIDER !== current.SEARCH_LLM_PROVIDER}
+                                    >
+                                        {({ getFieldValue }) => {
+                                            const provider = getFieldValue('SEARCH_LLM_PROVIDER');
+                                            return (
+                                                <Form.Item name="SEARCH_LLM_MODEL" label={t("config.model") || "Model"} style={{ marginBottom: 0 }}>
+                                                    <Select options={provider ? MODEL_OPTIONS[provider] || [] : []} disabled={!provider} />
+                                                </Form.Item>
+                                            );
+                                        }}
+                                    </Form.Item>
+                                </Col>
+                            </Row>
+                        </Card>
+
+                        <Card size="small" title={t("config.general") || "General Settings"}>
+                             <Row gutter={12}>
+                                <Col span={12}>
+                                    <Form.Item name="timezone" label={t("config.timezone") || "Timezone"} style={{ marginBottom: 0 }}>
+                                        <Select options={TIMEZONE_OPTIONS} />
+                                    </Form.Item>
+                                </Col>
+                                <Col span={12}>
+                                    <Form.Item name="language" label={t("config.language") || "Language"} style={{ marginBottom: 0 }}>
+                                        <Select options={LANGUAGE_OPTIONS} />
+                                    </Form.Item>
+                                </Col>
+                             </Row>
+                        </Card>
+                    </Space>
+                </Col>
+            </Row>
+        </Form>
       </Modal>
     </Layout>
   );

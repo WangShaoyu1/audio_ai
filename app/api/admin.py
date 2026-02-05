@@ -53,6 +53,10 @@ async def create_instruction(
 ):
     service = InstructionService(db)
     try:
+        # Validate repository_id
+        if 'repository_id' not in data:
+            raise HTTPException(status_code=400, detail="repository_id is required")
+        
         # Pass user_id to service
         return await service.create_instruction(data, user_id=current_user.id)
     except Exception as e:
@@ -62,24 +66,38 @@ async def create_instruction(
 async def list_instructions(
     page: int = 1,
     page_size: int = 10,
+    repository_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     service = InstructionService(db)
+    repo_uuid = None
+    if repository_id:
+        try:
+            repo_uuid = uuid.UUID(repository_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid repository_id UUID")
+            
     # Pass user_id to service
-    return await service.get_instructions_paginated(user_id=current_user.id, page=page, page_size=page_size)
+    return await service.get_instructions_paginated(user_id=current_user.id, page=page, page_size=page_size, repository_id=repo_uuid)
 
 @router.post("/admin/instructions/import")
 async def import_instructions(
+    repository_id: str = Query(..., description="The repository ID to import instructions into"),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     service = InstructionImportService(db)
     try:
+        try:
+            repo_uuid = uuid.UUID(repository_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid repository_id UUID")
+
         content = await file.read()
-        # Pass user_id and filename to service
-        return await service.import_from_excel(content, user_id=current_user.id, filename=file.filename)
+        # Pass user_id, repository_id and filename to service
+        return await service.import_from_excel(content, user_id=current_user.id, repository_id=repo_uuid, filename=file.filename)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -201,9 +219,12 @@ async def get_rag_tests(
 class IndexRequest(BaseModel):
     provider: str
     model: str
+    language: str = "zh"
+    chunk_size: Optional[int] = None
+    chunk_overlap: Optional[int] = None
 
 
-async def background_index_document(doc_id: uuid.UUID, provider: str, model: str):
+async def background_index_document(doc_id: uuid.UUID, provider: str, model: str, chunk_size: Optional[int] = None, chunk_overlap: Optional[int] = None):
     """
     Background task for indexing documents.
     """
@@ -229,7 +250,7 @@ async def background_index_document(doc_id: uuid.UUID, provider: str, model: str
             
             # 3. Index Document (Generates embeddings and commits)
             # Note: rag.index_document commits the transaction!
-            await rag.index_document(doc_id, doc.content, provider=provider, model=model)
+            await rag.index_document(doc_id, doc.content, provider=provider, model=model, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
             
             # 4. Update Status (New Transaction)
             # Since expire_on_commit=False, 'doc' object is still valid but detached/clean.
@@ -239,6 +260,11 @@ async def background_index_document(doc_id: uuid.UUID, provider: str, model: str
             doc.provider = provider
             doc.model = model
             doc.error_msg = None 
+            if chunk_size:
+                doc.chunk_size = chunk_size
+            if chunk_overlap:
+                doc.chunk_overlap = chunk_overlap
+            
             await session.commit()
             logger.info(f"Background indexing finished for doc_id: {doc_id}")
             
@@ -275,10 +301,15 @@ async def index_document_endpoint(
         
     # Set status to processing immediately
     doc.status = "processing"
+    doc.language = request.language
+    if request.chunk_size:
+        doc.chunk_size = request.chunk_size
+    if request.chunk_overlap:
+        doc.chunk_overlap = request.chunk_overlap
     await db.commit()
     
     # Add background task
-    background_tasks.add_task(background_index_document, doc_id, request.provider, request.model)
+    background_tasks.add_task(background_index_document, doc_id, request.provider, request.model, request.chunk_size, request.chunk_overlap)
     
     return {"status": "processing", "message": "Indexing started in background"}
 
@@ -438,6 +469,9 @@ class DocumentResponse(BaseModel):
     created_at: datetime
     provider: Optional[str]
     model: Optional[str]
+    language: Optional[str]
+    chunk_size: Optional[int]
+    chunk_overlap: Optional[int]
     is_configured: bool
     error_msg: Optional[str]
     

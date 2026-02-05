@@ -15,6 +15,7 @@ export interface Message {
   confidence?: number;
   metadata?: any;
   isError?: boolean;
+  feedback?: 'like' | 'dislike' | null;
 }
 
 export interface SystemState {

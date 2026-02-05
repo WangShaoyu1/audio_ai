@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button, Modal, Typography } from "antd";
+import { useTranslation } from "react-i18next";
 
 const { Title, Text } = Typography;
 
@@ -20,6 +21,7 @@ export function ManusDialog({
   onOpenChange,
   onClose,
 }: ManusDialogProps) {
+  const { t } = useTranslation();
   const [internalOpen, setInternalOpen] = useState(open);
 
   useEffect(() => {
@@ -77,7 +79,7 @@ export function ManusDialog({
           </Title>
         )}
         <Text style={{ color: '#858481', fontSize: 14 }}>
-          Please login with Manus to continue
+          {t('login.manus.title')}
         </Text>
       </div>
 
@@ -95,7 +97,7 @@ export function ManusDialog({
             border: 'none'
           }}
         >
-          Login with Manus
+          {t('login.manus.button')}
         </Button>
       </div>
     </Modal>

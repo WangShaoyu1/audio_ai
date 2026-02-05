@@ -4,7 +4,7 @@ import {
   Table, Button, Card, Input, Modal, Form, Select,
   Switch, Slider, Progress, Badge, Tooltip, App,
   Upload as AntUpload, Row, Col, List, Typography,
-  Space, Empty, Spin
+  Space, Empty, Spin, InputNumber, Popconfirm
 } from "antd";
 import { 
   FileTextOutlined, DeleteOutlined, ReloadOutlined, 
@@ -213,21 +213,14 @@ export default function KnowledgeBase() {
     }
   };
 
-  const handleDelete = (doc: Document) => {
-    modal.confirm({
-      title: t('kb.confirmDelete'),
-      content: t('kb.deleteWarning'),
-      okType: 'danger',
-      onOk: async () => {
-        try {
-          await api.delete(`/admin/documents/${doc.id}`);
-          message.success(t("kb.docDeleted"));
-          fetchDocuments(pagination.current);
-        } catch (error) {
-          message.error("Failed to delete document");
-        }
-      }
-    });
+  const handleDelete = async (doc: Document) => {
+    try {
+      await api.delete(`/admin/documents/${doc.id}`);
+      message.success(t("kb.docDeleted"));
+      fetchDocuments(pagination.current);
+    } catch (error) {
+      message.error("Failed to delete document");
+    }
   };
 
   const handlePreview = async (doc: Document) => {
@@ -304,7 +297,10 @@ export default function KnowledgeBase() {
     setIndexDocId(doc.id);
     indexForm.setFieldsValue({
       provider: 'openai',
-      model: 'text-embedding-3-small'
+      model: 'text-embedding-3-small',
+      language: 'zh',
+      chunk_size: 1000,
+      chunk_overlap: 200
     });
     setIndexModalOpen(true);
   };
@@ -317,7 +313,10 @@ export default function KnowledgeBase() {
       setIndexing(true);
       await api.post(`/admin/documents/${indexDocId}/index`, {
         provider: values.provider,
-        model: values.model
+        model: values.model,
+        language: values.language,
+        chunk_size: values.chunk_size,
+        chunk_overlap: values.chunk_overlap
       });
       message.success(t("kb.indexingSuccess"));
       setIndexModalOpen(false);
@@ -447,23 +446,30 @@ export default function KnowledgeBase() {
               disabled={record.status !== 'indexed'}
             />
           </Tooltip>
-          <Tooltip title={t("kb.tooltipTest") === "kb.tooltipTest" ? "召回测试" : t("kb.tooltipTest")}>
+          <Tooltip title={t("kb.tooltipTest")}>
             <Button 
               icon={<PlayCircleOutlined />} 
               size="small" 
               onClick={() => handleOpenTest(record)}
               disabled={record.status !== 'indexed' || !record.is_configured}
             >
-              召回测试
+              {t("kb.tooltipTest")}
             </Button>
           </Tooltip>
           <Tooltip title={t("kb.delete")}>
-            <Button 
-              danger 
-              icon={<DeleteOutlined />} 
-              size="small" 
-              onClick={() => handleDelete(record)} 
-            />
+            <Popconfirm
+              title={t('kb.confirmDelete')}
+              description={t('kb.deleteWarning')}
+              onConfirm={() => handleDelete(record)}
+              okText={t("common.confirm")}
+              cancelText={t("common.cancel")}
+            >
+              <Button 
+                danger 
+                icon={<DeleteOutlined />} 
+                size="small" 
+              />
+            </Popconfirm>
           </Tooltip>
         </Space>
       ),
@@ -542,7 +548,7 @@ export default function KnowledgeBase() {
           <Col span={16} style={{ height: '100%' }}>
             <Card title={t("kb.testDetails")} style={{ height: '100%', display: 'flex', flexDirection: 'column' }} bodyStyle={{ flex: 1, overflowY: 'auto' }}>
                {selectedTest ? (
-                 <Space direction="vertical" style={{ width: '100%' }} size="large">
+                 <Space orientation="vertical" style={{ width: '100%' }} size="large">
                    <div>
                      <Text type="secondary">{t("kb.testQuery")}</Text>
                      <div style={{ background: '#f5f5f5', padding: 12, borderRadius: 4, marginTop: 4 }}>
@@ -675,6 +681,8 @@ export default function KnowledgeBase() {
         confirmLoading={savingConfig}
         width={600}
         maskClosable={false}
+        okText={t("common.confirm")}
+        cancelText={t("common.cancel")}
       >
         <Form
           form={configForm}
@@ -794,6 +802,26 @@ export default function KnowledgeBase() {
                );
             }}
           </Form.Item>
+
+          <Form.Item name="language" label={t("kb.indexLanguage")} initialValue="zh">
+            <Select>
+              <Option value="zh">{t("common.lang.zh")}</Option>
+              <Option value="en">{t("common.lang.en")}</Option>
+            </Select>
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="chunk_size" label={t("kb.indexChunkSize")}>
+                 <InputNumber style={{ width: '100%' }} min={1} placeholder="Default" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="chunk_overlap" label={t("kb.indexChunkOverlap")}>
+                 <InputNumber style={{ width: '100%' }} min={0} placeholder="Default" />
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
 

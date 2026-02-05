@@ -14,7 +14,7 @@ class InstructionImportService:
         self.db = db
         self.instruction_service = InstructionService(db)
 
-    async def import_from_excel(self, file_content: bytes, user_id: uuid.UUID, filename: str = "import.xlsx") -> Dict[str, Any]:
+    async def import_from_excel(self, file_content: bytes, user_id: uuid.UUID, repository_id: uuid.UUID, filename: str = "import.xlsx") -> Dict[str, Any]:
         """
         Import instructions from Excel or CSV file.
         """
@@ -51,6 +51,7 @@ class InstructionImportService:
                             pass
 
                     data = {
+                        "repository_id": repository_id,
                         "name": name,
                         "description": description,
                         "parameters": parameters,

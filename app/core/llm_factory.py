@@ -149,7 +149,8 @@ class LLMFactory:
 
     @staticmethod
     def create_llm(provider: str, model_name: str, temperature: float = 0.1, streaming: bool = False):
-        provider = provider.lower()
+        print(f"DEBUG: create_llm called with provider='{provider}' model='{model_name}'")
+        provider = provider.lower().strip()
         
         # Validate config before attempting to create LLM
         LLMFactory._validate_config(provider)
@@ -202,19 +203,15 @@ class LLMFactory:
                     **kwargs
                 )
             elif provider == "minimax":
-                LLMFactory._check_dependency(MiniMaxChat, "minimax")
-                kwargs = {}
-                base_url = LLMFactory._get_base_url("MINIMAX")
-                if base_url:
-                    kwargs["minimax_api_base"] = base_url
-                    
-                return MiniMaxChat(
-                    minimax_api_key=settings.MINIMAX_API_KEY,
-                    minimax_group_id=settings.MINIMAX_GROUP_ID,
+                # Use OpenAI compatible endpoint for Minimax to avoid wrapper issues
+                LLMFactory._check_dependency(ChatOpenAI, "minimax", "langchain-openai")
+                base_url = LLMFactory._get_base_url("MINIMAX") or "https://api.minimax.chat/v1"
+                return ChatOpenAI(
+                    api_key=settings.MINIMAX_API_KEY,
+                    base_url=base_url,
                     model=model_name,
                     temperature=temperature,
-                    streaming=streaming,
-                    **kwargs
+                    streaming=streaming
                 )
             elif provider == "deepseek":
                 # Deepseek is OpenAI compatible
@@ -245,6 +242,7 @@ class LLMFactory:
                     **kwargs
                 )
             elif provider == "qianfan":
+                print(f"DEBUG: Entering Qianfan block. QianfanChatEndpoint is {QianfanChatEndpoint}")
                 LLMFactory._check_dependency(QianfanChatEndpoint, "qianfan")
                 kwargs = {}
                 base_url = LLMFactory._get_base_url("QIANFAN")
@@ -292,13 +290,30 @@ class LLMFactory:
             raise
 
     @staticmethod
-    def get_llm_for_scenario(scenario: str):
+    def get_llm_for_scenario(scenario: str, config: Optional[dict] = None):
         """
         Get LLM instance based on scenario configuration
-        scenarios: 'instruction', 'rag', 'chat'
+        scenarios: 'instruction', 'rag', 'chat', 'search'
+        config: Optional session-specific configuration override. 
+                Expected keys: 'INSTRUCTION_LLM_PROVIDER', 'INSTRUCTION_LLM_MODEL', etc.
         """
-        provider = getattr(settings, f"{scenario.upper()}_LLM_PROVIDER") or settings.DEFAULT_LLM_PROVIDER
-        model = getattr(settings, f"{scenario.upper()}_LLM_MODEL") or settings.DEFAULT_LLM_MODEL
+        # Default keys based on scenario
+        provider_key = f"{scenario.upper()}_LLM_PROVIDER"
+        model_key = f"{scenario.upper()}_LLM_MODEL"
+
+        # Check config first
+        provider = None
+        model = None
+        
+        if config:
+            provider = config.get(provider_key)
+            model = config.get(model_key)
+
+        # Fallback to settings
+        if not provider:
+            provider = getattr(settings, provider_key) or settings.DEFAULT_LLM_PROVIDER
+        if not model:
+            model = getattr(settings, model_key) or settings.DEFAULT_LLM_MODEL
         
         # Adjust temperature based on scenario
         temp = 0.1 if scenario == "instruction" else 0.7

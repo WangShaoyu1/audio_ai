@@ -55,9 +55,9 @@ export default function JsonLogger({ messages, onClear }: JsonLoggerProps) {
         height: '100%'
       }}
     >
-      <Space direction="vertical" style={{ width: '100%' }} size={16}>
-        {messages.map((msg) => (
-          <div key={msg.id} style={{ width: '100%' }}>
+      <Space orientation="vertical" style={{ width: '100%' }} size={16}>
+        {messages.map((msg, index) => (
+          <div key={`${msg.id}-${index}`} style={{ width: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, color: token.colorTextSecondary }}>
               <Space style={{ overflow: 'hidden', flex: 1 }}>
                 <Text type="secondary" style={{ fontSize: 12 }}>[{new Date(msg.timestamp).toLocaleTimeString()}]</Text>
@@ -216,7 +216,7 @@ export default function JsonLogger({ messages, onClear }: JsonLoggerProps) {
       <Drawer
         title={t("logger.title")}
         placement="right"
-        width={800}
+        size="large"
         onClose={() => setIsDrawerOpen(false)}
         open={isDrawerOpen}
         styles={{

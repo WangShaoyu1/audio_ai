@@ -10,6 +10,7 @@ from app.api.deps import get_current_user
 from app.models.base import User
 from app.core.route_logging import LoggingContextRoute
 import json
+import asyncio
 
 router = APIRouter(route_class=LoggingContextRoute)
 dm = DialogueManager()
@@ -36,21 +37,40 @@ async def chat(
         if request.stream:
             async def generate():
                 # Use a new session for streaming to avoid premature closure
-                async with AsyncSessionLocal() as session:
-                    async for chunk in dm.stream_process_request(
-                        request.session_id,
-                        request.query,
-                        str(current_user.id),
-                        session,
-                        trace_id=trace_id
-                    ):
-                        if isinstance(chunk, dict):
-                            # Metadata/Actions chunk
-                            yield f"data: {json.dumps(chunk)}\n\n"
-                        else:
-                            # Content chunk
-                            yield f"data: {json.dumps({'content': chunk})}\n\n"
-                    yield "data: [DONE]\n\n"
+                try:
+                    async with AsyncSessionLocal() as session:
+                        async for chunk in dm.stream_process_request(
+                            request.session_id,
+                            request.query,
+                            str(current_user.id),
+                            session,
+                            trace_id=trace_id
+                        ):
+                            if isinstance(chunk, dict):
+                                # Metadata/Actions chunk
+                                yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
+                            else:
+                                # Content chunk
+                                yield f"data: {json.dumps({'content': chunk}, ensure_ascii=False)}\n\n"
+                        yield "data: [DONE]\n\n"
+                except BaseException as e:
+                    # Check for cancellation/exit to avoid yielding during cleanup
+                    if isinstance(e, (GeneratorExit, asyncio.CancelledError)):
+                        # Stream cancelled by client or server shutdown
+                        return
+
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Stream generation error: {e}", exc_info=True)
+                    
+                    try:
+                        # Send error as content to be displayed to user
+                        error_msg = f"\n\n[System Error] {str(e)}"
+                        yield f"data: {json.dumps({'content': error_msg}, ensure_ascii=False)}\n\n"
+                        yield "data: [DONE]\n\n"
+                    except BaseException:
+                        # If yielding fails (e.g. connection closed), just exit
+                        pass
             
             return StreamingResponse(generate(), media_type="text/event-stream")
         else:

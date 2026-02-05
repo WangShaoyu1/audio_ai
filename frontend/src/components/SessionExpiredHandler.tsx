@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Modal } from "antd";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 
 export default function SessionExpiredHandler() {
   const [open, setOpen] = useState(false);
   const [, setLocation] = useLocation();
+  const { t } = useTranslation();
 
   useEffect(() => {
     const handleUnauthorized = () => {
@@ -26,16 +28,16 @@ export default function SessionExpiredHandler() {
 
   return (
     <Modal
-      title="登录已过期"
+      title={t('login.expired.title')}
       open={open}
       onOk={handleLogin}
       closable={false}
       maskClosable={false}
       cancelButtonProps={{ style: { display: 'none' } }}
-      okText="重新登录"
+      okText={t('login.expired.button')}
       centered
     >
-      <p>您的登录会话已过期，请重新登录以继续使用。</p>
+      <p>{t('login.expired.message')}</p>
     </Modal>
   );
 }

@@ -52,7 +52,7 @@
     "trace_id": "uuid-xxx",
     "route": "chat_search", // instruction / rag / chat / chat_search
     "models_used": {
-      "router": "gpt-3.5-turbo",
+      "router": "gpt-4o-mini",
       "executor": "qwen-max"
     },
     "latency": {

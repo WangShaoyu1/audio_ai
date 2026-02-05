@@ -107,6 +107,7 @@ class MemoryManager:
                 role=role,
                 content=content,
                 metadata_=metadata or {},
+                hit_source=(metadata or {}).get("hit_source"),
                 embedding=embedding
             )
             self.db.add(db_msg)

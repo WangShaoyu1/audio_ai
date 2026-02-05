@@ -6,8 +6,10 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import KnowledgeBase from "./pages/KnowledgeBase";
+import InstructionRepos from "./pages/InstructionRepos";
 import Instructions from "./pages/Instructions";
 import BatchEval from "./pages/BatchEval";
+import BatchFeedback  from "./pages/BatchFeedback";
 import Layout from "@/components/Layout";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
@@ -41,11 +43,17 @@ function Router() {
       <Route path="/knowledge-base">
         <ProtectedRoute component={KnowledgeBase} />
       </Route>
+      <Route path="/instruction-repos">
+        <ProtectedRoute component={InstructionRepos} />
+      </Route>
       <Route path="/instructions">
         <ProtectedRoute component={Instructions} />
       </Route>
       <Route path="/batch-eval">
         <ProtectedRoute component={BatchEval} />
+      </Route>
+      <Route path="/batch-feedback">
+        <ProtectedRoute component={BatchFeedback} />
       </Route>
       <Route path="/">
         <ProtectedRoute component={Home} />

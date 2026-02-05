@@ -3,7 +3,7 @@ import json
 import time
 import os
 
-BASE_URL = "http://localhost:8001/api/v1"
+BASE_URL = "http://localhost:8000/api/v1"
 TEST_USER = "test_user_001"
 TEST_PASSWORD = "password123"
 
@@ -13,9 +13,8 @@ def log(message, status="INFO"):
 def test_login():
     log("Testing Login...")
     url = f"{BASE_URL}/auth/login"
-    # Backend expects 'phone' and 'code' (or password if modified), checking error msg: "missing... phone"
-    # Assuming the backend was updated to use phone login as per PRD v2.1
-    payload = {"phone": "13800138000", "code": "123456"} 
+    # Backend expects 'phone'
+    payload = {"phone": "13800138000"} 
     try:
         response = requests.post(url, json=payload)
         if response.status_code == 200:
@@ -33,11 +32,9 @@ def test_sessions(token):
     log("Testing Session Management...")
     headers = {"Authorization": f"Bearer {token}"}
     
-    # 1. Create Session (Implicitly via Chat or Explicitly if API exists)
-    # Assuming explicit creation or listing first
-    
-    # 2. List Sessions
+    # 1. List Sessions
     log("  - List Sessions")
+    sessions = []
     try:
         res = requests.get(f"{BASE_URL}/sessions", headers=headers)
         if res.status_code == 200:
@@ -50,14 +47,23 @@ def test_sessions(token):
         log(f"    List Sessions Exception: {e}", "FAIL")
         return None
 
-    # 3. Create a new session via chat (if no explicit create endpoint)
-    # Or use the first existing session
+    # 2. Create Session (if needed or just to test the endpoint)
     session_id = None
-    if sessions:
-        session_id = sessions[0]['id']
+    if not sessions:
+        log("  - Creating New Session")
+        try:
+            res = requests.post(f"{BASE_URL}/sessions", headers=headers)
+            if res.status_code == 200:
+                new_session = res.json()
+                session_id = new_session['id']
+                log(f"    Session Created: {session_id}", "PASS")
+            else:
+                log(f"    Create Session Failed: {res.text}", "FAIL")
+        except Exception as e:
+            log(f"    Create Session Exception: {e}", "FAIL")
     else:
-        # Try to create one via chat
-        pass 
+        session_id = sessions[0]['id']
+        log(f"    Using existing session: {session_id}", "INFO")
 
     return session_id
 
@@ -146,17 +152,55 @@ def test_knowledge_base(token):
     
     log("  - Upload Document")
     try:
-        files = {'file': ('test_doc.txt', open('test_doc.txt', 'rb'), 'text/plain')}
-        res = requests.post(f"{BASE_URL}/admin/documents/upload", headers=headers, files=files)
-        if res.status_code == 200:
-            log("    Upload Successful", "PASS")
-        else:
-            log(f"    Upload Failed: {res.text}", "FAIL")
+        with open('test_doc.txt', 'rb') as f_upload:
+            files = {'file': ('test_doc.txt', f_upload, 'text/plain')}
+            res = requests.post(f"{BASE_URL}/admin/documents/upload", headers=headers, files=files)
+            if res.status_code == 200:
+                log("    Upload Successful", "PASS")
+            else:
+                log(f"    Upload Failed: {res.text}", "FAIL")
     except Exception as e:
         log(f"    Upload Exception: {e}", "FAIL")
     finally:
         if os.path.exists("test_doc.txt"):
-            os.remove("test_doc.txt")
+            try:
+                os.remove("test_doc.txt")
+            except Exception as e:
+                log(f"    Cleanup Warning: Could not remove test_doc.txt: {e}", "WARN")
+
+def test_session_config(token, session_id):
+    log("Testing Session Config Interface...")
+    headers = {"Authorization": f"Bearer {token}"}
+    if not session_id:
+        log("  Skipping Config Test (No Session ID)", "WARN")
+        return
+
+    # Update Config with language
+    log("  - Update Session Config (language=en)")
+    config = {"language": "en"}
+    try:
+        res = requests.put(f"{BASE_URL}/sessions/{session_id}/config", json=config, headers=headers)
+        if res.status_code == 200:
+            log("    Update Config Successful", "PASS")
+        else:
+            log(f"    Update Config Failed: {res.text}", "FAIL")
+    except Exception as e:
+        log(f"    Update Config Exception: {e}", "FAIL")
+
+    # Get Config and verify language
+    log("  - Get Session Config")
+    try:
+        res = requests.get(f"{BASE_URL}/sessions/{session_id}/config", headers=headers)
+        if res.status_code == 200:
+            data = res.json()
+            if data.get("language") == "en":
+                log("    Get Config Verified (language=en)", "PASS")
+            else:
+                log(f"    Get Config Verification Failed: language={data.get('language')}", "FAIL")
+        else:
+            log(f"    Get Config Failed: {res.text}", "FAIL")
+    except Exception as e:
+        log(f"    Get Config Exception: {e}", "FAIL")
 
 def run_tests():
     log("Starting Comprehensive Interface Tests...")
@@ -172,6 +216,7 @@ def run_tests():
 
     # 3. Chat
     if session_id:
+        test_session_config(token, session_id)
         test_chat(token, session_id)
         test_history(token, session_id)
     

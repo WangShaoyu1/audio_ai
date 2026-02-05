@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Card, Input, Table, Modal, message, theme, Upload as AntUpload } from "antd";
-import { PlusOutlined, ReloadOutlined, UploadOutlined, CloudUploadOutlined, DeleteOutlined, CopyOutlined, CheckOutlined, DownOutlined, UpOutlined, CodeOutlined } from "@ant-design/icons";
+import { PlusOutlined, ReloadOutlined, CloudUploadOutlined, DeleteOutlined, CopyOutlined, CheckOutlined, DownOutlined, UpOutlined, CodeOutlined, ArrowLeftOutlined, UploadOutlined } from "@ant-design/icons";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { useLocation } from "wouter";
 import type { UploadProps } from 'antd';
 
 const { TextArea } = Input;
@@ -97,6 +98,7 @@ interface Instruction {
 
 export default function Instructions() {
   const { t } = useTranslation();
+  const [location, setLocation] = useLocation();
   const [instructions, setInstructions] = useState<Instruction[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -112,14 +114,26 @@ export default function Instructions() {
   });
 
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Extract repoId from query string
+  const queryParams = new URLSearchParams(window.location.search);
+  const repoId = queryParams.get("repoId");
+
+  useEffect(() => {
+      if (!repoId) {
+          setLocation("/instruction-repos");
+      }
+  }, [repoId, setLocation]);
 
   const fetchInstructions = async (currentPage = page, currentPageSize = pageSize, query = searchQuery) => {
+    if (!repoId) return;
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
       const url = new URL("/api/v1/admin/instructions", window.location.origin);
       url.searchParams.append("page", currentPage.toString());
       url.searchParams.append("page_size", currentPageSize.toString());
+      url.searchParams.append("repository_id", repoId);
       if (query) {
         url.searchParams.append("q", query);
       }
@@ -141,8 +155,10 @@ export default function Instructions() {
   };
 
   useEffect(() => {
-    fetchInstructions(page, pageSize);
-  }, [page, pageSize]);
+    if (repoId) {
+        fetchInstructions(page, pageSize);
+    }
+  }, [page, pageSize, repoId]);
 
   const handleSearch = (value: string) => {
     setSearchQuery(value);
@@ -151,12 +167,13 @@ export default function Instructions() {
   };
 
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !repoId) return;
     const formData = new FormData();
     formData.append("file", selectedFile);
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("/api/v1/admin/instructions/import", {
+      // Append repository_id to URL
+      const response = await fetch(`/api/v1/admin/instructions/import?repository_id=${repoId}`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`
@@ -177,6 +194,7 @@ export default function Instructions() {
   };
 
   const handleCreate = async () => {
+    if (!repoId) return;
     try {
       const token = localStorage.getItem("token");
       let parsedParams = {};
@@ -194,6 +212,7 @@ export default function Instructions() {
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
+          repository_id: repoId,
           name: newInstruction.name,
           description: newInstruction.description,
           parameters: parsedParams
@@ -301,11 +320,19 @@ export default function Instructions() {
     },
   ];
 
+  if (!repoId) return null;
+
+  // @ts-ignore
   return (
     <div style={{ height: '100%', overflowY: 'auto', padding: 24 }}>
       <div style={{ margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1 style={{ fontSize: 24, fontWeight: 'bold', margin: 0 }}>{t("instructions.title")}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+             <Button icon={<ArrowLeftOutlined />} onClick={() => setLocation("/instruction-repos")}>
+                {t("repos.backToRepos")}
+             </Button>
+             <h1 style={{ fontSize: 24, fontWeight: 'bold', margin: 0 }}>{t("instructions.title")}</h1>
+          </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <Input.Search
               placeholder={t("home.searchPlaceholder")}
@@ -393,12 +420,12 @@ export default function Instructions() {
         <Modal
           title={t("instructions.batchImportTitle")}
           open={uploadDialogOpen}
+          maskClosable={false}
           onCancel={() => setUploadDialogOpen(false)}
           onOk={handleUpload}
           okText={t("home.confirm")}
           cancelText={t("home.cancel")}
           okButtonProps={{ disabled: !selectedFile }}
-          maskClosable={false}
         >
           <div style={{ padding: '24px 0' }}>
             <AntUpload.Dragger {...uploadProps} showUploadList={false}>

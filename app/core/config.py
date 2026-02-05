@@ -82,6 +82,11 @@ class Settings(BaseSettings):
     # Model Selection Strategy
     DEFAULT_LLM_PROVIDER: str = "openai"
     DEFAULT_LLM_MODEL: str = "gpt-3.5-turbo"
+    DEFAULT_LLM_PROVIDER_en: Optional[str] = None
+    DEFAULT_LLM_MODEL_en: Optional[str] = None
+
+    INTENT_LLM_PROVIDER: Optional[str] = None
+    INTENT_LLM_MODEL: Optional[str] = None
 
     INSTRUCTION_LLM_PROVIDER: Optional[str] = None
     INSTRUCTION_LLM_MODEL: Optional[str] = None
@@ -92,8 +97,10 @@ class Settings(BaseSettings):
     CHAT_LLM_PROVIDER: Optional[str] = None
     CHAT_LLM_MODEL: Optional[str] = None
 
+    SEARCH_LLM_PROVIDER: Optional[str] = None
+    SEARCH_LLM_MODEL: Optional[str] = None
+
     # Feature Flags
-    RAG_ENABLE: bool = True
     MEMORY_ENABLE: bool = True
 
     # Embedding Configuration (New)
@@ -116,6 +123,7 @@ class Settings(BaseSettings):
 
     # Memory Configuration
     # Short-term memory (Redis)
+    REDIS_ENABLE_EVICTION: bool = False # Enable eviction (TTL) for instruction cache
     SHORT_TERM_MEMORY_ENABLE: bool = True  # Enable Redis short-term memory
     SHORT_TERM_MEMORY_MAX_SIZE: int = 10  # Max number of messages in Redis short-term memory
     SHORT_TERM_MEMORY_TTL_SECONDS: int = 1800  # 30 minutes TTL for Redis short-term memory

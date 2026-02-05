@@ -1,0 +1,102 @@
+[
+  {
+    "question": "把音量调到50",
+    "answer": "{\"name\": \"volume_set\", \"parameters\": {\"value\": 50}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "音量设为30",
+    "answer": "{\"name\": \"volume_set\", \"parameters\": {\"value\": 30}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "声音大小调到20",
+    "answer": "{\"name\": \"volume_set\", \"parameters\": {\"value\": 20}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "声音开到80",
+    "answer": "{\"name\": \"volume_set\", \"parameters\": {\"value\": 80}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "给我把音量弄到10",
+    "answer": "{\"name\": \"volume_set\", \"parameters\": {\"value\": 10}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "音量100",
+    "answer": "{\"name\": \"volume_set\", \"parameters\": {\"value\": 100}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "50分音量",
+    "answer": "{\"name\": \"volume_set\", \"parameters\": {\"value\": 50}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "请帮我把音量调到45",
+    "answer": "{\"name\": \"volume_set\", \"parameters\": {\"value\": 45}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "麻烦声音调到60",
+    "answer": "{\"name\": \"volume_set\", \"parameters\": {\"value\": 60}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "导航去天安门",
+    "answer": "{\"name\": \"navigation\", \"parameters\": {\"destination\": \"天安门\"}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "带我去故宫",
+    "answer": "{\"name\": \"navigation\", \"parameters\": {\"destination\": \"故宫\"}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "我想去三里屯",
+    "answer": "{\"name\": \"navigation\", \"parameters\": {\"destination\": \"三里屯\"}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "倒计时60秒",
+    "answer": "{\"name\": \"timer_set\", \"parameters\": {\"duration_seconds\": 60}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "设定一个120秒的闹钟",
+    "answer": "{\"name\": \"timer_set\", \"parameters\": {\"duration_seconds\": 120}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "提醒我300秒后关火",
+    "answer": "{\"name\": \"timer_set\", \"parameters\": {\"duration_seconds\": 300}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "10分钟后叫我",
+    "answer": "{\"name\": \"timer_set\", \"parameters\": {\"duration_seconds\": 600}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "定时10秒",
+    "answer": "{\"name\": \"timer_set\", \"parameters\": {\"duration_seconds\": 10}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "你好",
+    "answer": "{\"name\": \"chat\", \"parameters\": {}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "退出",
+    "answer": "{\"name\": \"system\", \"parameters\": {\"action\": \"exit\"}}",
+    "intent": "instruction"
+  },
+  {
+    "question": "关闭",
+    "answer": "{\"name\": \"system\", \"parameters\": {\"action\": \"close\"}}",
+    "intent": "instruction"
+  }
+]

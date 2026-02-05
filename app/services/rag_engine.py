@@ -84,10 +84,7 @@ class RAGEngine:
                 
         return unique_models
 
-    async def search(self, query: str, user_id: uuid.UUID, top_k: int = 3, doc_ids: List[uuid.UUID] = None) -> List[Any]:
-        if not settings.RAG_ENABLE:
-            return []
-            
+    async def search(self, query: str, user_id: uuid.UUID, top_k: int = 3, doc_ids: List[uuid.UUID] = None, language: str = None) -> List[Any]:
         try:
             # 1. Get User Config
             config = await self.get_config(user_id)
@@ -122,6 +119,9 @@ class RAGEngine:
                         stmt = select(DocumentChunk).join(Document).filter(
                             Document.user_id == user_id
                         )
+
+                        if language:
+                             stmt = stmt.filter(Document.language == language)
                         
                         # Handle Null/Default matching logic if needed, 
                         # but for now assuming data is clean or we rely on exact match.
@@ -214,6 +214,9 @@ class RAGEngine:
                  stmt = select(DocumentChunk).join(Document).filter(Document.user_id == user_id)
                  if doc_ids:
                      stmt = stmt.filter(Document.id.in_(doc_ids))
+
+                 if language:
+                     stmt = stmt.filter(Document.language == language)
 
                  if lang == 'zh':
                      # Use ILIKE for Chinese (Simple fallback as PG default parser is not good for Chinese)
@@ -310,23 +313,25 @@ class RAGEngine:
         
         return [attach_score(x["item"], x["score"]) for x in sorted_items][:k]
 
-    async def index_document(self, doc_id: str, content: str, provider: str = None, model: str = None):
+    async def index_document(self, doc_id: str, content: str, provider: str = None, model: str = None, chunk_size: int = None, chunk_overlap: int = None):
         """
         Index document content using RecursiveCharacterTextSplitter
         """
-        logger.info(f"Starting indexing for doc_id: {doc_id} with {provider}/{model}")
+        logger.info(f"Starting indexing for doc_id: {doc_id} with {provider}/{model}, chunk_size={chunk_size}, overlap={chunk_overlap}")
         try:
-            # Determine chunk size based on model
-            # Some models like bge-large have smaller context windows (e.g. 512 tokens)
-            # 1000 chars might exceed 512 tokens for Chinese
-            chunk_size = settings.RAG_CHUNK_SIZE
-            if model and ("bge" in model.lower() or "bert" in model.lower()):
-                 chunk_size = 500
-                 logger.info(f"Adjusting chunk_size to {chunk_size} for model {model}")
+            # Determine chunk size
+            final_chunk_size = chunk_size if chunk_size else settings.RAG_CHUNK_SIZE
+            
+            # Model specific fallback if not manually configured
+            if not chunk_size and model and ("bge" in model.lower() or "bert" in model.lower()):
+                 final_chunk_size = 500
+                 logger.info(f"Adjusting chunk_size to {final_chunk_size} for model {model}")
+
+            final_chunk_overlap = chunk_overlap if chunk_overlap is not None else settings.RAG_CHUNK_OVERLAP
 
             splitter = RecursiveCharacterTextSplitter(
-                chunk_size=chunk_size,
-                chunk_overlap=settings.RAG_CHUNK_OVERLAP,
+                chunk_size=final_chunk_size,
+                chunk_overlap=final_chunk_overlap,
                 length_function=len,
             )
             
